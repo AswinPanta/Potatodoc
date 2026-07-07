@@ -1,0 +1,14 @@
+__pycache__/
+**/__pycache__/**
+*.pyc
+.DS_Store
+.git
+.gitignore
+
+# Project dirs not needed at runtime
+frontend/
+mobile/
+training/
+PlantVillage/
+*.md
+*.config.example

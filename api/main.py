@@ -1,33 +1,36 @@
-
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import numpy as np
 from io import BytesIO
 from PIL import Image
+from pathlib import Path
 import tensorflow as tf
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 app = FastAPI()
 
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://192.168.100.115:3000",
-]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load all models
-MODELS = {
-  "cnn-baseline": tf.keras.models.load_model("../saved_models/1"),
-  "transfer-learning": tf.keras.models.load_model("../saved_models/2"),
-  "mobilenetv2": tf.keras.models.load_model("../saved_models/3"),
-}
+BASE_DIR = Path(__file__).resolve().parent
+
+MODELS = {}
+MODEL_LOAD_ERRORS = {}
+
+for mid, path in [
+    ("cnn-baseline", BASE_DIR / "../saved_models/1"),
+    ("transfer-learning", BASE_DIR / "../saved_models/2"),
+    ("mobilenetv2", BASE_DIR / "../saved_models/3"),
+]:
+    try:
+        MODELS[mid] = tf.keras.models.load_model(path)
+    except Exception as exc:
+        MODEL_LOAD_ERRORS[mid] = str(exc)
 
 # Map model IDs to display names
 MODEL_NAMES = {
@@ -38,55 +41,75 @@ MODEL_NAMES = {
 
 CLASS_NAMES = ["Early Blight", "Late Blight", "Healthy"]
 
+def read_file_as_image(data) -> np.ndarray:
+    image = Image.open(BytesIO(data)).convert("RGB").resize((256, 256))
+    return np.array(image)
+
+def preprocess_for_model(image: np.ndarray, model_id: str) -> np.ndarray:
+    if model_id == "mobilenetv2":
+        return preprocess_input(image)
+    # Baseline and transfer-learning models already contain an internal
+    # Rescaling(1./255) layer, so they expect raw [0, 255] inputs.
+    return image
+
 @app.get("/ping")
-async def ping():
+def ping():
   return "Hello, I am alive"
 
 @app.get("/models")
-async def get_models():
+def get_models():
   return {"models": list(MODELS.keys()), "modelNames": MODEL_NAMES}
 
-def read_file_as_image(data) -> np.ndarray:
-    image = np.array(Image.open(BytesIO(data)))
-    return image
+@app.get("/health")
+def health():
+    if len(MODELS) == 3:
+        return {"status": "success", "models_loaded": list(MODELS.keys())}
+    return {
+        "status": "failure",
+        "models_loaded": list(MODELS.keys()),
+        "errors": MODEL_LOAD_ERRORS,
+    }
 
 @app.post("/predict")
 async def predict(
     file: UploadFile = File(...),
     model_id: str = "ensemble"
 ):
-    image = read_file_as_image(await file.read())
+    try:
+        image = read_file_as_image(await file.read())
+    except Exception:
+        return {"error": "Invalid image file"}
+
     img_batch = np.expand_dims(image, 0)
-    
+
     if model_id == "ensemble":
-        # Ensemble: average predictions from all models
-        all_predictions = []
         model_ids = list(MODELS.keys())
-        for model in MODELS.values():
-            all_predictions.append(model.predict(img_batch)[0])
+        all_predictions = []
+        for mid in model_ids:
+            processed = preprocess_for_model(img_batch, mid)
+            all_predictions.append(MODELS[mid].predict(processed)[0])
         avg_predictions = np.mean(all_predictions, axis=0)
         predicted_class = CLASS_NAMES[np.argmax(avg_predictions)]
         confidence = float(np.max(avg_predictions))
-        # Also return individual model predictions for transparency
-        individual = []
-        for idx, pred in enumerate(all_predictions):
-            model_id = model_ids[idx]
-            individual.append({
-                "model": MODEL_NAMES[model_id],
+        individual = [
+            {
+                "model": MODEL_NAMES[model_ids[idx]],
                 "class": CLASS_NAMES[np.argmax(pred)],
                 "confidence": float(np.max(pred))
-            })
+            }
+            for idx, pred in enumerate(all_predictions)
+        ]
         return {
             'class': predicted_class,
             'confidence': confidence,
             'individual': individual
         }
     else:
-        # Use selected model
         if model_id not in MODELS:
             return {"error": "Model not found"}
+        processed = preprocess_for_model(img_batch, model_id)
         model = MODELS[model_id]
-        predictions = model.predict(img_batch)
+        predictions = model.predict(processed)
         predicted_class = CLASS_NAMES[np.argmax(predictions[0])]
         confidence = float(np.max(predictions[0]))
         return {
