@@ -139,6 +139,7 @@ def compute_gradcam(model, img_array, model_id):
 def generate_heatmap_overlay(heatmap, original_image):
     """
     Generate a base64-encoded PNG of the heatmap overlaid on the original image.
+    Uses a sharper colormap and stronger blending for better visibility.
     original_image: numpy array of shape (256, 256, 3), range [0, 255]
     """
     # Resize heatmap to match original dimensions
@@ -146,14 +147,30 @@ def generate_heatmap_overlay(heatmap, original_image):
         heatmap[..., np.newaxis], (256, 256)
     ).numpy().squeeze()
 
-    # Apply jet colormap
-    heatmap_colored = cm.jet(heatmap_resized)[:, :, :3]  # RGBA -> RGB
+    # Normalize to [0, 1] and apply power transform for sharper contrast
+    heatmap_norm = np.clip(heatmap_resized, 0, 1)
+    # Apply gamma to emphasize high-attention areas
+    heatmap_gamma = np.power(heatmap_norm, 0.7)
+
+    # Use jet colormap for the heatmap
+    heatmap_colored = cm.jet(heatmap_gamma)[:, :, :3]
     heatmap_colored = np.uint8(255 * heatmap_colored)
 
-    # Blend with original image using PIL
+    # Use a mask to only color regions with significant attention (> 30%)
+    # This makes the heatmap cleaner and more interpretable
+    mask = heatmap_norm > 0.3
+    mask_3d = np.stack([mask] * 3, axis=-1)
+
+    # Blend: use stronger alpha in high-attention areas
     original_pil = Image.fromarray(original_image)
     heatmap_pil = Image.fromarray(heatmap_colored)
-    blended = Image.blend(original_pil, heatmap_pil, alpha=0.4)
+
+    # First blend the full heatmap at medium opacity for context
+    blended = Image.blend(original_pil, heatmap_pil, alpha=0.35)
+
+    # Then strongly highlight high-attention areas by overlaying on top
+    highlighted = Image.blend(original_pil, heatmap_pil, alpha=0.65)
+    blended = Image.composite(highlighted, blended, Image.fromarray(np.uint8(mask * 255)))
 
     # Convert to base64
     buffered = io.BytesIO()

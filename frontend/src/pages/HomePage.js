@@ -9,6 +9,7 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 import Typography from "@material-ui/core/Typography";
 import PhotoCamera from "@material-ui/icons/PhotoCamera";
 import SaveIcon from "@material-ui/icons/Save";
+import Refresh from "@material-ui/icons/Refresh";
 import Navbar from "../components/Navbar";
 import ModelSelector from "../components/ModelSelector";
 import ImageInput from "../components/ImageInput";
@@ -35,11 +36,11 @@ export default function HomePage() {
   const [heatmaps, setHeatmaps] = useState(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [fadeIn, setFadeIn] = useState(false);
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
 
-  // Store file for Grad-CAM
   useEffect(() => {
     fileRef.current = selectedFile;
   }, [selectedFile]);
@@ -62,19 +63,19 @@ export default function HomePage() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [selectedFile]);
 
-  // Auto-predict when a new image is selected or model changes (no auto-save)
   useEffect(() => {
     if (!preview) return;
     const doPrediction = async () => {
       setHeatmaps(null);
       setSaved(false);
+      setFadeIn(false);
       await sendFile(selectedFile, selectedModel);
+      setTimeout(() => setFadeIn(true), 100);
     };
     doPrediction();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preview, selectedModel]);
 
-  // Fetch Grad-CAM heatmap when prediction data is available
   useEffect(() => {
     if (!data || data.error || data.is_unknown) {
       setHeatmaps(null);
@@ -103,6 +104,7 @@ export default function HomePage() {
     setData(undefined);
     setImage(true);
     setShowWebcam(false);
+    setFadeIn(false);
   };
 
   const nextImage = () => {
@@ -113,6 +115,7 @@ export default function HomePage() {
     setShowWebcam(false);
     setHeatmaps(null);
     setSaved(false);
+    setFadeIn(false);
   };
 
   const handleSaveToHistory = () => {
@@ -168,6 +171,7 @@ export default function HomePage() {
     }
     setHeatmaps(null);
     setSaved(false);
+    setFadeIn(false);
   };
 
   const hasSaveableResult = data && !data.error && data.class !== "Unknown";
@@ -185,7 +189,7 @@ export default function HomePage() {
           spacing={3}
         >
           <Grid item xs={12} md={8} lg={6}>
-            <Card className={`${classes.imageCard} ${!image ? classes.imageCardEmpty : ''}`}>
+            <Card className={classes.imageCard}>
               <ModelSelector
                 models={models}
                 modelNames={modelNames}
@@ -203,13 +207,19 @@ export default function HomePage() {
               )}
 
               {image && !showWebcam && (
-                <CardActionArea style={{ padding: '0 16px 16px' }}>
-                  <CardMedia
-                    className={classes.media}
-                    image={preview}
-                    component="img"
-                    title="Potato Leaf"
-                  />
+                <CardActionArea style={{ padding: '16px 20px 8px' }}>
+                  <div style={{
+                    borderRadius: 16, overflow: 'hidden',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                  }}>
+                    <CardMedia
+                      className={classes.media}
+                      image={preview}
+                      component="img"
+                      title="Potato Leaf"
+                      style={{ maxHeight: 380 }}
+                    />
+                  </div>
                 </CardActionArea>
               )}
 
@@ -218,21 +228,32 @@ export default function HomePage() {
               )}
 
               {data && (
-                <PredictionResult
-                  data={data}
-                  heatmaps={heatmaps}
-                  heatmapLoading={heatmapLoading}
-                  selectedModel={selectedModel}
-                  modelNames={modelNames}
-                />
+                <div style={{
+                  opacity: fadeIn ? 1 : 0,
+                  transform: fadeIn ? 'translateY(0)' : 'translateY(16px)',
+                  transition: 'opacity 0.4s ease, transform 0.4s ease',
+                }}>
+                  <PredictionResult
+                    data={data}
+                    heatmaps={heatmaps}
+                    heatmapLoading={heatmapLoading}
+                    selectedModel={selectedModel}
+                    modelNames={modelNames}
+                  />
+                </div>
               )}
 
               {isLoading && (
                 <CardContent className={classes.detail}>
-                  <CircularProgress color="secondary" className={classes.loader} size={48} />
-                  <Typography className={classes.title} variant="h6" noWrap style={{ marginTop: 16, color: '#1B5E20' }}>
-                    Analyzing your image...
-                  </Typography>
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <CircularProgress size={52} className={classes.loader} thickness={4} />
+                    <Typography style={{ marginTop: 20, color: '#1B5E20', fontWeight: 600, fontSize: 16 }}>
+                      Analyzing your image...
+                    </Typography>
+                    <Typography style={{ marginTop: 8, color: '#888', fontSize: 13 }}>
+                      Running {selectedModel === "ensemble" ? "all 3 models" : "model prediction"}
+                    </Typography>
+                  </div>
                 </CardContent>
               )}
             </Card>
@@ -247,9 +268,9 @@ export default function HomePage() {
                   component="span"
                   size="large"
                   onClick={nextImage}
-                  startIcon={<PhotoCamera />}
+                  startIcon={<Refresh />}
                 >
-                  Next Image
+                  New Image
                 </ColorButton>
 
                 {hasSaveableResult && (
@@ -262,7 +283,7 @@ export default function HomePage() {
                     startIcon={<SaveIcon />}
                     disabled={saved}
                   >
-                    {saved ? "Saved!" : "Save to History"}
+                    {saved ? "✓ Saved!" : "Save to History"}
                   </SecondaryButton>
                 )}
               </div>

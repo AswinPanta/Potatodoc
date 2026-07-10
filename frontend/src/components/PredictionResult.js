@@ -18,64 +18,72 @@ import ExpandMore from "@material-ui/icons/ExpandMore";
 import ExpandLess from "@material-ui/icons/ExpandLess";
 import Whatshot from "@material-ui/icons/Whatshot";
 import Warning from "@material-ui/icons/Warning";
+import CheckCircle from "@material-ui/icons/CheckCircle";
+import ErrorIcon from "@material-ui/icons/Error";
+import InfoIcon from "@material-ui/icons/Info";
+import BarChart from "@material-ui/icons/BarChart";
 import DISEASE_INFO from "../constants/diseaseInfo";
 import { useStyles } from "../constants/theme";
 
 const CLASS_COLORS = {
-  "Early Blight": "#C62828",
-  "Late Blight": "#E65100",
-  "Healthy": "#2E7D32",
+  "Early Blight": { primary: "#C62828", bg: "#FFEBEE", light: "#EF5350" },
+  "Late Blight": { primary: "#E65100", bg: "#FFF3E0", light: "#FF9800" },
+  "Healthy": { primary: "#2E7D32", bg: "#E8F5E9", light: "#66BB6A" },
 };
 
 function ProbabilityBarChart({ probabilities, predictedClass }) {
-  const classes = useStyles();
-
   if (!probabilities) return null;
-
   const entries = Object.entries(probabilities);
 
   return (
-    <div style={{ marginTop: 20, width: '100%' }}>
-      <Typography variant="subtitle1" style={{ color: '#1B5E20', fontWeight: 'bold', marginBottom: 12 }}>
+    <div style={{ marginTop: 24, width: '100%' }}>
+      <Typography variant="subtitle1" style={{
+        color: '#1B5E20', fontWeight: 700, marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 8, fontSize: 16,
+      }}>
+        <BarChart style={{ fontSize: 20 }} />
         Per-Class Probabilities
       </Typography>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {entries.map(([className, prob]) => {
           const pct = (prob * 100).toFixed(1);
           const isPredicted = className === predictedClass;
-          const barColor = CLASS_COLORS[className] || '#666';
+          const color = CLASS_COLORS[className] || { primary: '#666', bg: '#F5F5F5', light: '#999' };
           return (
-            <div key={className}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div key={className} style={{
+              padding: '10px 14px',
+              backgroundColor: isPredicted ? color.bg : '#FAFAFA',
+              borderRadius: 12,
+              border: isPredicted ? `2px solid ${color.primary}` : '1px solid #E8E8E8',
+              transition: 'all 0.3s ease',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <Typography variant="body2" style={{
-                  fontWeight: isPredicted ? 'bold' : 'normal',
-                  color: isPredicted ? barColor : '#555',
-                  fontSize: 13,
+                  fontWeight: isPredicted ? 700 : 500,
+                  color: isPredicted ? color.primary : '#555',
+                  fontSize: 14,
                 }}>
                   {className} {isPredicted ? '←' : ''}
                 </Typography>
                 <Typography variant="body2" style={{
-                  fontWeight: isPredicted ? 'bold' : 'normal',
-                  color: isPredicted ? barColor : '#555',
-                  fontSize: 13,
+                  fontWeight: isPredicted ? 700 : 500,
+                  color: isPredicted ? color.primary : '#888',
+                  fontSize: 14,
                 }}>
                   {pct}%
                 </Typography>
               </div>
               <div style={{
-                width: '100%',
-                height: 10,
-                backgroundColor: '#E8E8E8',
-                borderRadius: 5,
-                overflow: 'hidden',
+                width: '100%', height: 8,
+                backgroundColor: '#E8E8E8', borderRadius: 4, overflow: 'hidden',
               }}>
                 <div style={{
-                  width: `${pct}%`,
-                  height: '100%',
-                  backgroundColor: barColor,
-                  borderRadius: 5,
-                  opacity: isPredicted ? 1 : 0.4,
-                  transition: 'width 0.5s ease',
+                  width: `${pct}%`, height: '100%',
+                  backgroundColor: color.light,
+                  borderRadius: 4,
+                  opacity: isPredicted ? 1 : 0.5,
+                  transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: isPredicted ? `0 0 8px ${color.light}` : 'none',
                 }} />
               </div>
             </div>
@@ -93,32 +101,49 @@ function DiseaseInfoCard({ diseaseClass }) {
 
   return (
     <div className={classes.infoSection}>
-      <Typography variant="h6" gutterBottom className={classes.infoTitle}>
-        About {diseaseClass}
-      </Typography>
-      <Typography variant="body2" style={{ marginBottom: 16, lineHeight: 1.6, color: '#444' }}>
-        {info.description}
-      </Typography>
-      <Typography variant="subtitle1" className={classes.infoTitle} style={{ marginBottom: 8 }}>
-        Symptoms:
-      </Typography>
-      <List className={classes.infoList} dense>
-        {info.symptoms.map((symptom, idx) => (
-          <ListItem key={idx} className={classes.infoListItem}>
-            <ListItemText primary={`• ${symptom}`} />
-          </ListItem>
-        ))}
-      </List>
-      <Typography variant="subtitle1" className={classes.infoTitle} style={{ marginBottom: 8, marginTop: 16 }}>
-        {diseaseClass === "Healthy" ? "Care Tips:" : "Treatment & Mitigation:"}
-      </Typography>
-      <List className={classes.infoList} dense>
-        {info.treatment.map((tip, idx) => (
-          <ListItem key={idx} className={classes.infoListItem}>
-            <ListItemText primary={`• ${tip}`} />
-          </ListItem>
-        ))}
-      </List>
+      <div style={{
+        backgroundColor: '#F5FBF5',
+        borderRadius: 16,
+        padding: '20px 24px',
+        border: '1px solid #C8E6C9',
+      }}>
+        <Typography variant="h6" style={{
+          color: '#1B5E20', fontWeight: 700, marginBottom: 12,
+          display: 'flex', alignItems: 'center', gap: 8, fontSize: 17,
+        }}>
+          <InfoIcon style={{ fontSize: 20, color: '#2E7D32' }} />
+          About {diseaseClass}
+        </Typography>
+        <Typography variant="body2" style={{ marginBottom: 16, lineHeight: 1.7, color: '#444', fontSize: 14 }}>
+          {info.description}
+        </Typography>
+
+        <Typography variant="subtitle1" style={{
+          color: '#2E7D32', fontWeight: 600, marginBottom: 8, fontSize: 15,
+        }}>
+          {diseaseClass === "Healthy" ? "✅ Characteristics" : "🔍 Symptoms"}
+        </Typography>
+        <List dense style={{ padding: 0 }}>
+          {info.symptoms.map((symptom, idx) => (
+            <ListItem key={idx} style={{ padding: '3px 0' }}>
+              <ListItemText primary={`• ${symptom}`} primaryTypographyProps={{ style: { color: '#444', fontSize: 13 } }} />
+            </ListItem>
+          ))}
+        </List>
+
+        <Typography variant="subtitle1" style={{
+          color: '#2E7D32', fontWeight: 600, marginBottom: 8, marginTop: 16, fontSize: 15,
+        }}>
+          {diseaseClass === "Healthy" ? "💚 Care Tips" : "💊 Treatment & Mitigation"}
+        </Typography>
+        <List dense style={{ padding: 0 }}>
+          {info.treatment.map((tip, idx) => (
+            <ListItem key={idx} style={{ padding: '3px 0' }}>
+              <ListItemText primary={`• ${tip}`} primaryTypographyProps={{ style: { color: '#444', fontSize: 13 } }} />
+            </ListItem>
+          ))}
+        </List>
+      </div>
     </div>
   );
 }
@@ -126,13 +151,14 @@ function DiseaseInfoCard({ diseaseClass }) {
 function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames }) {
   const classes = useStyles();
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const hasEnsemble = selectedModel === "ensemble";
 
   if (heatmapLoading) {
     return (
       <div className={classes.heatmapSection}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: 12 }}>
-          <CircularProgress size={18} className={classes.loader} />
-          <Typography variant="body2" style={{ color: '#2E7D32' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', padding: 20 }}>
+          <CircularProgress size={20} className={classes.loader} />
+          <Typography variant="body2" style={{ color: '#2E7D32', fontWeight: 600 }}>
             Computing heatmap...
           </Typography>
         </div>
@@ -142,8 +168,6 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
 
   if (!heatmaps) return null;
 
-  const hasEnsemble = selectedModel === "ensemble";
-
   return (
     <div className={classes.heatmapSection}>
       <div
@@ -151,56 +175,80 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
         onClick={() => setShowHeatmap(!showHeatmap)}
         style={{ cursor: 'pointer' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Whatshot style={{ color: '#E65100' }} />
-          <Typography variant="subtitle1" style={{ color: '#2E7D32', fontWeight: 'bold' }}>
-            Explainable AI - Heatmap
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Whatshot style={{ color: '#E65100', fontSize: 22 }} />
+          <Typography variant="subtitle1" style={{ color: '#1B5E20', fontWeight: 700, fontSize: 15 }}>
+            Explainable AI — Heatmap
           </Typography>
         </div>
-        {showHeatmap ? <ExpandLess /> : <ExpandMore />}
+        {showHeatmap ? <ExpandLess style={{ color: '#666' }} /> : <ExpandMore style={{ color: '#666' }} />}
       </div>
 
       <Collapse in={showHeatmap}>
         <div className={classes.heatmapContent}>
-          <Typography variant="body2" style={{ color: '#666', marginBottom: 12, lineHeight: 1.5 }}>
-            The heatmap highlights which regions of the image the model focused on
-            to make its prediction. Red areas indicate high importance, blue areas low importance.
+          <Typography variant="body2" style={{
+            color: '#666', marginBottom: 16, lineHeight: 1.6, fontSize: 13,
+            padding: '12px 16px', backgroundColor: '#F5F5F5', borderRadius: 10,
+          }}>
+            🔥 The heatmap shows which parts of the image influenced the model's decision.
+            <strong> Red areas</strong> = high importance, <strong>blue areas</strong> = low importance.
           </Typography>
 
           {hasEnsemble && heatmaps.heatmaps ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {Object.entries(heatmaps.heatmaps).map(([modelName, overlayUrl]) => (
-                <div key={modelName}>
-                  <Typography variant="caption" style={{ color: '#555', fontWeight: 600, marginBottom: 8, display: 'block' }}>
+                <div key={modelName} style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 14,
+                  padding: 16,
+                  border: '1px solid #E8F5E9',
+                }}>
+                  <Typography variant="caption" style={{
+                    color: '#1B5E20', fontWeight: 700, marginBottom: 10,
+                    display: 'block', fontSize: 12, textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}>
                     {modelName}
                   </Typography>
                   {overlayUrl ? (
                     <img
                       src={overlayUrl}
-                      alt={`${modelName} Grad-CAM heatmap`}
-                      style={{ width: '100%', borderRadius: 12, border: '2px solid #E8F5E9' }}
+                      alt={`${modelName} heatmap`}
+                      style={{
+                        width: '100%', borderRadius: 12,
+                        border: '2px solid #E8F5E9',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                      }}
                     />
                   ) : (
-                    <Typography variant="caption" style={{ color: '#999' }}>
+                    <div style={{
+                      padding: 24, textAlign: 'center', backgroundColor: '#FAFAFA',
+                      borderRadius: 10, color: '#999', fontSize: 13,
+                    }}>
                       Heatmap unavailable for this model
-                    </Typography>
+                    </div>
                   )}
                 </div>
               ))}
             </div>
           ) : (
             heatmaps.heatmap && (
-              <img
-                src={heatmaps.heatmap}
-                alt="Grad-CAM heatmap overlay"
-                style={{ width: '100%', borderRadius: 12, border: '2px solid #E8F5E9' }}
-              />
+              <div style={{
+                backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12,
+                border: '1px solid #E8F5E9',
+              }}>
+                <img
+                  src={heatmaps.heatmap}
+                  alt="Grad-CAM heatmap overlay"
+                  style={{
+                    width: '100%', borderRadius: 10,
+                    border: '2px solid #E8F5E9',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  }}
+                />
+              </div>
             )
           )}
-
-          <Typography variant="caption" style={{ color: '#999', marginTop: 8, display: 'block', textAlign: 'center' }}>
-            Grad-CAM visualization • Red = high importance
-          </Typography>
         </div>
       </Collapse>
     </div>
@@ -213,27 +261,49 @@ function UnknownImageCard({ data }) {
 
   return (
     <div className={classes.unknownCard}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
-        <Warning style={{ color: '#F57C00', fontSize: 40 }} />
-        <Typography variant="h5" style={{ color: '#E65100', fontWeight: 'bold' }}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 12, marginBottom: 20,
+      }}>
+        <Warning style={{ color: '#F57C00', fontSize: 56 }} />
+        <Typography variant="h5" style={{ color: '#E65100', fontWeight: 800, fontSize: 24 }}>
           Unknown Image
         </Typography>
       </div>
-      <Typography variant="body1" style={{ color: '#555', textAlign: 'center', marginBottom: 12 }}>
-        {data.message || "This does not appear to be a potato leaf."}
+      <Typography variant="body1" style={{
+        color: '#555', textAlign: 'center', marginBottom: 16, fontSize: 15, lineHeight: 1.6,
+      }}>
+        {data.message || "This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf."}
       </Typography>
-      <Typography variant="body2" style={{ color: '#888', textAlign: 'center' }}>
+      <div style={{
+        display: 'inline-block', padding: '8px 20px',
+        backgroundColor: '#FFF3E0', borderRadius: 20,
+        color: '#E65100', fontWeight: 600, fontSize: 14,
+        marginBottom: 20,
+      }}>
         Max confidence: {confidence}%
-      </Typography>
-      <div style={{ marginTop: 16, padding: 16, backgroundColor: '#FFF3E0', borderRadius: 12 }}>
-        <Typography variant="subtitle2" style={{ color: '#E65100', fontWeight: 'bold', marginBottom: 8 }}>
+      </div>
+      <div style={{
+        padding: 20, backgroundColor: '#FFF8E1',
+        borderRadius: 14, border: '1px solid #FFE082',
+        textAlign: 'left',
+      }}>
+        <Typography variant="subtitle2" style={{
+          color: '#E65100', fontWeight: 700, marginBottom: 12, fontSize: 14,
+        }}>
           Suggestions:
         </Typography>
-        <List dense>
-          <ListItem><ListItemText primary="• Upload a clear photo of a potato leaf" /></ListItem>
-          <ListItem><ListItemText primary="• Ensure the leaf occupies most of the frame" /></ListItem>
-          <ListItem><ListItemText primary="• Use good lighting for better results" /></ListItem>
-          <ListItem><ListItemText primary="• Avoid non-plant or blurred images" /></ListItem>
+        <List dense style={{ padding: 0 }}>
+          {[
+            'Upload a clear photo of a potato leaf',
+            'Ensure the leaf occupies most of the frame',
+            'Use good lighting for better results',
+            'Avoid non-plant or blurred images',
+          ].map((s, i) => (
+            <ListItem key={i} style={{ padding: '3px 0' }}>
+              <ListItemText primary={`• ${s}`} primaryTypographyProps={{ style: { color: '#795548', fontSize: 13 } }} />
+            </ListItem>
+          ))}
         </List>
       </div>
     </div>
@@ -243,7 +313,6 @@ function UnknownImageCard({ data }) {
 export default function PredictionResult({ data, heatmaps, heatmapLoading, selectedModel, modelNames }) {
   const classes = useStyles();
 
-  // Handle unknown image
   if (data.is_unknown || data.class === "Unknown") {
     return (
       <CardContent className={classes.detail}>
@@ -254,104 +323,139 @@ export default function PredictionResult({ data, heatmaps, heatmapLoading, selec
 
   const confidence = (parseFloat(data.confidence) * 100).toFixed(2);
   const isLowConfidence = parseFloat(confidence) < 70;
-
-  // Determine color based on class
-  const resultColor = data.class === "Healthy" ? '#2E7D32' : '#C62828';
+  const diseaseClass = data.class;
+  const colors = CLASS_COLORS[diseaseClass] || CLASS_COLORS["Healthy"];
 
   return (
     <CardContent className={classes.detail}>
-      <Typography variant="h5" gutterBottom style={{ color: resultColor, fontWeight: 'bold', marginBottom: 16 }}>
-        Prediction Result
-      </Typography>
+      {/* Prediction Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 12, marginBottom: 8, width: '100%',
+      }}>
+        {diseaseClass === "Healthy" ? (
+          <CheckCircle style={{ color: colors.primary, fontSize: 32 }} />
+        ) : (
+          <ErrorIcon style={{ color: colors.primary, fontSize: 32 }} />
+        )}
+        <Typography variant="h5" style={{
+          color: colors.primary, fontWeight: 800, fontSize: 22,
+          letterSpacing: '-0.3px',
+        }}>
+          {diseaseClass}
+        </Typography>
+      </div>
 
-      {/* Main Prediction Table */}
-      <TableContainer component={Paper} className={classes.tableContainer} style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
-        <Table className={classes.table} size="small" aria-label="simple table">
-          <TableHead className={classes.tableHead}>
-            <TableRow className={classes.tableRow}>
-              <TableCell className={classes.tableCell1}>Label</TableCell>
-              <TableCell align="right" className={classes.tableCell1}>Confidence</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody className={classes.tableBody}>
-            <TableRow className={classes.tableRow}>
-              <TableCell component="th" scope="row" className={classes.tableCell} style={{ color: resultColor }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Chip
-                    label={data.class}
-                    style={{
-                      backgroundColor: data.class === "Healthy" ? '#E8F5E9' : '#FFEBEE',
-                      color: resultColor,
-                      fontWeight: 'bold',
-                      fontSize: 14,
-                    }}
-                  />
-                </div>
-              </TableCell>
-              <TableCell align="right" className={classes.tableCell} style={{ color: resultColor }}>
-                {confidence}%
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Chip
+        label={`${confidence}% Confidence`}
+        style={{
+          backgroundColor: colors.bg,
+          color: colors.primary,
+          fontWeight: 700,
+          fontSize: 14,
+          padding: '4px 8px',
+          marginBottom: 20,
+        }}
+      />
 
-      {/* Per-Class Probabilities Bar Chart */}
+      {/* Prediction Table */}
+      <div style={{
+        width: '100%',
+        backgroundColor: colors.bg,
+        borderRadius: 14,
+        padding: '16px 20px',
+        marginBottom: 4,
+        border: `1px solid ${colors.bg}`,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body1" style={{ fontWeight: 600, color: '#333', fontSize: 15 }}>
+            Prediction
+          </Typography>
+          <Typography variant="body1" style={{ fontWeight: 700, color: colors.primary, fontSize: 15 }}>
+            {confidence}%
+          </Typography>
+        </div>
+      </div>
+
+      {/* Per-Class Probabilities */}
       {data.probabilities && (
-        <ProbabilityBarChart
-          probabilities={data.probabilities}
-          predictedClass={data.class}
-        />
+        <ProbabilityBarChart probabilities={data.probabilities} predictedClass={data.class} />
       )}
 
       {/* Low Confidence Warning */}
       {isLowConfidence && (
-        <div style={{ marginTop: 20, padding: 16, backgroundColor: '#FFF3CD', borderRadius: 12, border: '1px solid #FFEEBA' }}>
-          <Typography variant="subtitle2" style={{ color: '#856404', fontWeight: 'bold', marginBottom: 8 }}>
-            ⚠️ Low Confidence Prediction
+        <div style={{
+          marginTop: 24, padding: '16px 20px',
+          backgroundColor: '#FFF8E1', borderRadius: 14,
+          border: '1px solid #FFE082',
+          width: '100%',
+        }}>
+          <Typography variant="subtitle2" style={{
+            color: '#E65100', fontWeight: 700, marginBottom: 10, fontSize: 14,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <Warning style={{ fontSize: 20 }} />
+            Low Confidence — Retake?
           </Typography>
-          <Typography variant="body2" style={{ color: '#856404' }}>
-            The model is not very confident in this prediction. Please try retaking the photo:
+          <Typography variant="body2" style={{ color: '#795548', fontSize: 13, lineHeight: 1.6 }}>
+            The model isn't very confident. Try retaking the photo with better lighting
+            and ensure the leaf is clear and centered.
           </Typography>
-          <List dense>
-            <ListItem><ListItemText primary="• Make sure the photo shows a clear potato leaf" /></ListItem>
-            <ListItem><ListItemText primary="• Use better natural lighting" /></ListItem>
-            <ListItem><ListItemText primary="• Ensure the leaf is in focus and centered" /></ListItem>
-            <ListItem><ListItemText primary="• Avoid blurry or dark photos" /></ListItem>
-          </List>
         </div>
       )}
 
-      {/* Individual Model Predictions (Ensemble) */}
+      {/* Individual Model Predictions */}
       {data.individual && (
         <div style={{ marginTop: 24, width: '100%' }}>
-          <Typography variant="h6" gutterBottom style={{ color: '#1B5E20', fontWeight: 'bold', marginBottom: 12 }}>
-            Individual Model Predictions
+          <Typography variant="subtitle1" style={{
+            color: '#1B5E20', fontWeight: 700, marginBottom: 14, fontSize: 16,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <InfoIcon style={{ fontSize: 20 }} />
+            Individual Model Results
           </Typography>
-          <TableContainer component={Paper} className={classes.tableContainer} style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
-            <Table className={classes.table} size="small">
+          <TableContainer component={Paper} className={classes.tableContainer}>
+            <Table size="small">
               <TableHead className={classes.tableHead}>
-                <TableRow className={classes.tableRow}>
-                  <TableCell className={classes.tableCell1}>Model</TableCell>
-                  <TableCell className={classes.tableCell1}>Label</TableCell>
-                  <TableCell align="right" className={classes.tableCell1}>Confidence</TableCell>
+                <TableRow>
+                  <TableCell>Model</TableCell>
+                  <TableCell>Prediction</TableCell>
+                  <TableCell align="right">Confidence</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody className={classes.tableBody}>
-                {data.individual.map((pred, idx) => (
-                  <TableRow key={idx} className={classes.tableRow}>
-                    <TableCell className={classes.tableCell1}>{pred.model}</TableCell>
-                    <TableCell className={classes.tableCell1}>{pred.class}</TableCell>
-                    <TableCell align="right" className={classes.tableCell1}>{(pred.confidence * 100).toFixed(2)}%</TableCell>
-                  </TableRow>
-                ))}
+                {data.individual.map((pred, idx) => {
+                  const c = CLASS_COLORS[pred.class] || CLASS_COLORS["Healthy"];
+                  return (
+                    <TableRow key={idx}>
+                      <TableCell style={{ fontWeight: 600, color: '#333', fontSize: 13 }}>
+                        {pred.model}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={pred.class}
+                          size="small"
+                          style={{
+                            backgroundColor: c.bg,
+                            color: c.primary,
+                            fontWeight: 600,
+                            fontSize: 12,
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell align="right" style={{ fontWeight: 600, color: '#333', fontSize: 13 }}>
+                        {(pred.confidence * 100).toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
         </div>
       )}
 
-      {/* Grad-CAM Heatmap Section */}
+      {/* Grad-CAM */}
       <HeatmapSection
         heatmaps={heatmaps}
         heatmapLoading={heatmapLoading}
