@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PotatoDoc — Model Summary</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #1a1a1a;
+    background: #f8faf8;
+    line-height: 1.6;
+    padding: 24px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 32px 24px;
+    background: linear-gradient(135deg, #2E7D32, #4CAF50);
+    color: white;
+    border-radius: 16px;
+    margin-bottom: 32px;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  .header .subtitle { font-size: 14px; opacity: 0.85; }
+  .header .date { font-size: 12px; opacity: 0.65; margin-top: 8px; }
+
+  /* Section */
+  .section { margin-bottom: 28px; }
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #2E7D32;
+    border-bottom: 2px solid #C8E6C9;
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+  }
+
+  /* Cards */
+  .model-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+    page-break-inside: avoid;
+  }
+  .model-card h3 {
+    font-size: 16px;
+    color: #1B5E20;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .model-card h3 .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .badge-best { background: #E8F5E9; color: #2E7D32; }
+  .badge-placeholder { background: #FFF3E0; color: #E65100; }
+  .badge-light { background: #E3F2FD; color: #1565C0; }
+
+  /* Grid */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-box {
+    background: #f5f7f5;
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .stat-box .value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #2E7D32;
+  }
+  .stat-box .label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 10px 0;
+  }
+  th {
+    background: #f0f4f0;
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #555;
+  }
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #eee;
+  }
+  tr:last-child td { border-bottom: none; }
+  .highlight-row { background: #E8F5E9; font-weight: 600; }
+
+  /* Architecture */
+  .arch-block {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 10px 0;
+  }
+  .arch-block .dim { color: #7c7c7c; }
+  .arch-block .layer { color: #81C784; }
+  .arch-block .op { color: #64B5F6; }
+
+  /* Comparison */
+  .comparison-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+  }
+  .bar-label { font-size: 12px; width: 130px; text-align: right; color: #555; }
+  .bar-track {
+    flex: 1;
+    height: 20px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+  }
+  .bar-cnn { background: #FFA726; }
+  .bar-tl { background: #42A5F5; }
+  .bar-mn { background: #66BB6A; }
+
+  /* Confusion matrix */
+  .cm-table th, .cm-table td { text-align: center; padding: 6px 8px; font-size: 12px; }
+  .cm-table .diag { background: #E8F5E9; font-weight: 700; }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 11px;
+    color: #999;
+    border-top: 1px solid #eee;
+    margin-top: 24px;
+  }
+
+  /* Print */
+  @media print {
+    body { padding: 0; background: white; }
+    .model-card { box-shadow: none; border: 1px solid #ddd; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+  <h1>PotatoDoc — Model Summary</h1>
+  <div class="subtitle">Potato Disease Classification · 3 Models · PlantVillage Dataset</div>
+  <div class="date">Generated July 2026</div>
+</div>
+
+<!-- Dataset Overview -->
+<div class="section">
+  <div class="section-title">Dataset Overview</div>
+  <div class="model-card">
+    <div class="stat-grid">
+      <div class="stat-box"><div class="value">2,152</div><div class="label">Total Images</div></div>
+      <div class="stat-box"><div class="value">256×256</div><div class="label">Input Size</div></div>
+      <div class="stat-box"><div class="value">3</div><div class="label">Classes</div></div>
+      <div class="stat-box"><div class="value">80/10/10</div><div class="label">Train/Val/Test</div></div>
+    </div>
+    <table>
+      <tr><th>Class</th><th>Images</th><th>Description</th></tr>
+      <tr><td>Early Blight</td><td>632</td><td><em>Alternaria solani</em> — dark concentric rings on leaves</td></tr>
+      <tr><td>Late Blight</td><td>760</td><td><em>Phytophthora infestans</em> — water-soaked lesions, white mold</td></tr>
+      <tr><td>Healthy</td><td>760</td><td>Normal green potato leaves</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Model 1: CNN Baseline -->
+<div class="section">
+  <div class="section-title">Individual Models</div>
+
+  <div class="model-card">
+    <h3>CNN Baseline <span class="badge badge-light">Custom CNN</span></h3>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="value">92.58%</div><div class="label">Test Accuracy</div></div>
+      <div class="stat-box"><div class="value">0.2128</div><div class="label">Test Loss</div></div>
+      <div class="stat-box"><div class="value">232K</div><div class="label">Parameters</div></div>
+      <div class="stat-box"><div class="value">~1 MB</div><div class="label">File Size</div></div>
+      <div class="stat-box"><div class="value">120 ms</div><div class="label">Avg Latency</div></div>
+      <div class="stat-box"><div class="value">20 / 256</div><div class="label">Misclassified</div></div>
+    </div>
+
+    <div class="arch-block"><span class="dim">Input (256×256×3)</span>
+  → <span class="op">Rescaling</span>(1/255)
+  → <span class="op">RandomFlip</span> + <span class="op">RandomRotation</span>(0.2)
+  → <span class="layer">Conv2D(32, 3×3)</span> → ReLU → MaxPool(2×2)
+  → <span class="layer">Conv2D(64, 3×3)</span> → ReLU → MaxPool(2×2)
+  → <span class="layer">Conv2D(128, 3×3)</span> → ReLU → MaxPool(2×2)
+  → <span class="layer">Conv2D(256, 3×3)</span> → ReLU → MaxPool(2×2)
+  → <span class="layer">Conv2D(512, 3×3)</span> → ReLU → MaxPool(2×2)
+  → <span class="layer">Conv2D(512, 3×3)</span> → ReLU → MaxPool(2×2)
+  → <span class="op">GlobalAveragePooling2D</span>
+  → <span class="layer">Dense(256)</span> → ReLU → Dropout(0.5)
+  → <span class="layer">Dense(128)</span> → ReLU
+  → <span class="layer">Dense(3)</span> → Softmax</div>
+
+    <p style="font-size:13px; margin-bottom:10px;"><strong>Training:</strong> Adam optimizer, Sparse Categorical Crossentropy, 10 epochs, ~40 min on CPU.</p>
+
+    <table>
+      <tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr>
+      <tr><td>Early Blight</td><td>0.8810</td><td>0.9823</td><td>0.9289</td><td>113</td></tr>
+      <tr><td>Late Blight</td><td>0.9636</td><td>0.8689</td><td>0.9138</td><td>122</td></tr>
+      <tr><td>Healthy</td><td>0.9500</td><td>0.9048</td><td>0.9268</td><td>21</td></tr>
+      <tr class="highlight-row"><td>Macro Avg</td><td>0.9315</td><td>0.9186</td><td>0.9232</td><td>256</td></tr>
+    </table>
+
+    <p style="font-size:12px; color:#888; margin-top:8px;">⚠ Main failure mode: 15 of 20 errors are Late Blight misclassified as Early Blight.</p>
+  </div>
+
+  <!-- Model 2: Transfer Learning -->
+  <div class="model-card">
+    <h3>Transfer Learning (ResNet50V2) <span class="badge badge-placeholder">Phase 1 Only</span></h3>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="value">~97.4%</div><div class="label">Best Val Acc</div></div>
+      <div class="stat-box"><div class="value">~95%</div><div class="label">Est. Test Acc</div></div>
+      <div class="stat-box"><div class="value">23.9M</div><div class="label">Parameters</div></div>
+      <div class="stat-box"><div class="value">~91 MB</div><div class="label">File Size</div></div>
+      <div class="stat-box"><div class="value">6</div><div class="label">Epochs Run</div></div>
+      <div class="stat-box"><div class="value">—</div><div class="label">Misclassified</div></div>
+    </div>
+
+    <div class="arch-block"><span class="dim">Input (256×256×3)</span>
+  → <span class="op">RandomFlip</span> + <span class="op">RandomRotation</span>(0.2)
+  → <span class="layer">ResNet50V2</span> <span class="dim">(ImageNet weights, frozen)</span>
+  → <span class="op">GlobalAveragePooling2D</span>
+  → Dropout(0.3)
+  → <span class="layer">Dense(128)</span> → ReLU
+  → <span class="layer">Dense(3)</span> → Softmax</div>
+
+    <p style="font-size:13px; margin-bottom:10px;"><strong>Training:</strong> Phase 1 — head only, 6 epochs, best val acc 97.40% at epoch 3. Phase 2 (fine-tune last 20 layers) was skipped due to CPU constraints (~12 min/epoch).</p>
+
+    <table>
+      <tr><th>Epoch</th><th>Train Loss</th><th>Train Acc</th><th>Val Loss</th><th>Val Acc</th></tr>
+      <tr><td>1</td><td>0.1507</td><td>94.62%</td><td>0.0795</td><td>96.35%</td></tr>
+      <tr><td>2</td><td>0.1621</td><td>93.98%</td><td>0.0990</td><td>95.31%</td></tr>
+      <tr class="highlight-row"><td>3</td><td>0.1171</td><td>95.66%</td><td>0.0685</td><td>97.40%</td></tr>
+      <tr><td>4</td><td>0.1136</td><td>96.06%</td><td>0.1029</td><td>94.27%</td></tr>
+      <tr><td>5</td><td>0.0994</td><td>96.41%</td><td>0.1126</td><td>94.79%</td></tr>
+      <tr><td>6</td><td>0.0994</td><td>96.41%</td><td>0.1126</td><td>94.79%</td></tr>
+    </table>
+
+    <p style="font-size:12px; color:#888; margin-top:8px;">⚠ saved_models/2/ currently contains a CNN Baseline copy as placeholder. Actual Phase 1 weights exist as checkpoint file (91 MB).</p>
+  </div>
+
+  <!-- Model 3: MobileNetV2 -->
+  <div class="model-card">
+    <h3>MobileNetV2 <span class="badge badge-best">Best Model</span></h3>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="value">99.61%</div><div class="label">Test Accuracy</div></div>
+      <div class="stat-box"><div class="value">0.0146</div><div class="label">Test Loss</div></div>
+      <div class="stat-box"><div class="value">2.4M</div><div class="label">Parameters</div></div>
+      <div class="stat-box"><div class="value">~10 MB</div><div class="label">File Size</div></div>
+      <div class="stat-box"><div class="value">210 ms</div><div class="label">Avg Latency</div></div>
+      <div class="stat-box"><div class="value">1 / 256</div><div class="label">Misclassified</div></div>
+    </div>
+
+    <div class="arch-block"><span class="dim">Input (256×256×3)</span>
+  → <span class="op">RandomFlip</span> + <span class="op">RandomRotation</span>(0.2)
+  → <span class="layer">MobileNetV2</span> <span class="dim">(ImageNet weights)</span>
+  → <span class="op">GlobalAveragePooling2D</span>
+  → Dropout(0.3)
+  → <span class="layer">Dense(128)</span> → ReLU
+  → <span class="layer">Dense(3)</span> → Softmax</div>
+
+    <p style="font-size:13px; margin-bottom:10px;"><strong>Training:</strong> Two-phase — Phase 1 (10 epochs, frozen backbone, 98.96% val) → Phase 2 (6 epochs, fine-tune last 30 layers at lr=1e-5, 99.48% val). ~45 min total on CPU.</p>
+
+    <table>
+      <tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr>
+      <tr><td>Early Blight</td><td>0.9912</td><td>1.0000</td><td>0.9956</td><td>113</td></tr>
+      <tr><td>Late Blight</td><td>1.0000</td><td>0.9918</td><td>0.9959</td><td>122</td></tr>
+      <tr><td>Healthy</td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>21</td></tr>
+      <tr class="highlight-row"><td>Macro Avg</td><td>0.9971</td><td>0.9973</td><td>0.9972</td><td>256</td></tr>
+    </table>
+
+    <p style="font-size:12px; color:#888; margin-top:8px;">Only 1 error: Late Blight → Early Blight. Correctly classifies all 14 Late→Early images that CNN Baseline got wrong.</p>
+  </div>
+</div>
+
+<!-- Confusion Matrices -->
+<div class="section">
+  <div class="section-title">Confusion Matrices</div>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div class="model-card">
+      <h3 style="font-size:14px;">CNN Baseline</h3>
+      <table class="cm-table">
+        <tr><th></th><th>Pred EB</th><th>Pred LB</th><th>Pred H</th></tr>
+        <tr><td><strong>Actual EB</strong></td><td class="diag">111</td><td>2</td><td>0</td></tr>
+        <tr><td><strong>Actual LB</strong></td><td>15</td><td class="diag">106</td><td>1</td></tr>
+        <tr><td><strong>Actual H</strong></td><td>0</td><td>2</td><td class="diag">19</td></tr>
+      </table>
+    </div>
+    <div class="model-card">
+      <h3 style="font-size:14px;">MobileNetV2</h3>
+      <table class="cm-table">
+        <tr><th></th><th>Pred EB</th><th>Pred LB</th><th>Pred H</th></tr>
+        <tr><td><strong>Actual EB</strong></td><td class="diag">113</td><td>0</td><td>0</td></tr>
+        <tr><td><strong>Actual LB</strong></td><td>1</td><td class="diag">121</td><td>0</td></tr>
+        <tr><td><strong>Actual H</strong></td><td>0</td><td>0</td><td class="diag">21</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Visual Comparison -->
+<div class="section">
+  <div class="section-title">Model Comparison</div>
+  <div class="model-card">
+    <h3 style="font-size:14px;">Test Accuracy</h3>
+    <div class="comparison-bar">
+      <div class="bar-label">CNN Baseline</div>
+      <div class="bar-track"><div class="bar-fill bar-cnn" style="width:92.58%;">92.58%</div></div>
+    </div>
+    <div class="comparison-bar">
+      <div class="bar-label">Transfer Learning</div>
+      <div class="bar-track"><div class="bar-fill bar-tl" style="width:97.40%;">~97.4% (val)</div></div>
+    </div>
+    <div class="comparison-bar">
+      <div class="bar-label">MobileNetV2</div>
+      <div class="bar-track"><div class="bar-fill bar-mn" style="width:99.61%;">99.61%</div></div>
+    </div>
+
+    <h3 style="font-size:14px; margin-top:16px;">Per-Class F1-Score</h3>
+    <table>
+      <tr><th>Class</th><th>CNN Baseline</th><th>MobileNetV2</th><th>Delta</th></tr>
+      <tr><td>Early Blight</td><td>0.9289</td><td>0.9956</td><td style="color:#2E7D32; font-weight:600;">+0.067</td></tr>
+      <tr><td>Late Blight</td><td>0.9138</td><td>0.9959</td><td style="color:#2E7D32; font-weight:600;">+0.082</td></tr>
+      <tr><td>Healthy</td><td>0.9268</td><td>1.0000</td><td style="color:#2E7D32; font-weight:600;">+0.073</td></tr>
+      <tr class="highlight-row"><td>Macro F1</td><td>0.9232</td><td>0.9972</td><td style="color:#2E7D32; font-weight:600;">+0.074</td></tr>
+    </table>
+
+    <h3 style="font-size:14px; margin-top:16px;">Full Comparison</h3>
+    <table>
+      <tr><th>Metric</th><th>CNN Baseline</th><th>Transfer Learning</th><th>MobileNetV2</th></tr>
+      <tr><td>Test Accuracy</td><td>92.58%</td><td>~95% (est.)</td><td><strong>99.61%</strong></td></tr>
+      <tr><td>Parameters</td><td>232K</td><td>23.9M</td><td>2.4M</td></tr>
+      <tr><td>File Size</td><td>~1 MB</td><td>~91 MB</td><td>~10 MB</td></tr>
+      <tr><td>Avg Latency</td><td>120 ms</td><td>—</td><td>210 ms</td></tr>
+      <tr><td>P95 Latency</td><td>177 ms</td><td>—</td><td>414 ms</td></tr>
+      <tr><td>Misclassified</td><td>20 / 256</td><td>—</td><td><strong>1 / 256</strong></td></tr>
+      <tr><td>Training Time</td><td>~40 min</td><td>~42 min (P1)</td><td>~45 min</td></tr>
+    </table>
+
+    <p style="font-size:12px; color:#888; margin-top:10px;">Note: Ensemble (softmax averaging) scored 87.50% — worse than individual models due to CNN Baseline's systematic Late→Early bias.</p>
+  </div>
+</div>
+
+<!-- Deployment -->
+<div class="section">
+  <div class="section-title">Deployment Details</div>
+  <div class="model-card">
+    <table>
+      <tr><th>Property</th><th>Detail</th></tr>
+      <tr><td>API Framework</td><td>FastAPI (Python)</td></tr>
+      <tr><td>Model Loading</td><td><code>tf.keras.models.load_model()</code> from <code>saved_models/{1,2,3}/</code></td></tr>
+      <tr><td>Input Preprocessing</td><td>CNN & TL: raw [0,255] (internal Rescaling). MobileNetV2: <code>preprocess_input</code> → [-1,1]</td></tr>
+      <tr><td>Output</td><td>Class name + confidence score (softmax probabilities)</td></tr>
+      <tr><td>Ensemble</td><td>Averages softmax outputs of all loaded models (currently disabled — worse than MobileNetV2 alone)</td></tr>
+      <tr><td>Frontend</td><td>React (Material-UI) — webcam + file upload</td></tr>
+      <tr><td>Mobile</td><td>React Native (Expo) — camera + gallery</td></tr>
+      <tr><td>Hosting</td><td>Hugging Face Spaces (Docker, python:3.9-slim, TF 2.5.0)</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  PotatoDoc — Potato Disease Classification · Generated July 2026
+</div>
+
+</div>
+</body>
+</html>

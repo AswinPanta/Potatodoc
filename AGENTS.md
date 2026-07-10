@@ -10,64 +10,52 @@
 ## Key File Structure
 ```
 project root/
-├── api/main.py              # FastAPI — loads models from saved_models/{1,2,3}/
-├── frontend/src/            # React app (refactored from single home.js)
-│   ├── pages/HomePage.js
-│   ├── components/ (Navbar, ModelSelector, ImageInput, WebcamCapture, PredictionResult, HistoryDialog)
-│   ├── hooks/ (useApi, useHistory)
-│   └── constants/ (diseaseInfo, theme)
-├── mobile/                  # React Native (Expo) app
-│   ├── App.js
-│   └── src/screens/HomeScreen.js + components + hooks + constants
+├── api/main.py              # FastAPI + GradCAM + unknown detection + entropy check
+├── frontend/src/            # React app (14 files)
+│   ├── pages/HomePage.js    # Manual save, GradCAM fetch, Next Image
+│   ├── components/          # PredictionResult (heatmap, per-class bars, unknown card)
+│   └── hooks/constants/     # fetchGradcam(), useHistory()
+├── mobile/                  # React Native (Expo) — same features as web
 ├── training/                # Training scripts + reports
-│   ├── train_cnn_baseline.py
-│   ├── train_mobilenet.py
-│   ├── train_transfer_learning.py
-│   ├── evaluate_models.py
-│   ├── find_errors.py
-│   ├── TRAINING_REPORT.md
-│   └── TRAINING_REPORT.html
-├── saved_models/            # Trained model files (git-tracked, ~33 MB)
-├── PlantVillage/            # Dataset (not tracked)
-├── Dockerfile               # For deployment (python:3.9-slim + TF 2.5.0)
+├── saved_models/            # Models (baked into Docker image)
+├── Dockerfile               # tensorflow/tensorflow:2.5.0 base
 └── README.md
 ```
 
-## Bugs Fixed (6 total)
-1. `train_mobilenet.py` — `x` used before assignment in data augmentation
-2. `api/main.py` — `file.read()` in sync def → changed to async
-3. `api/main-tf-serving.py` — same async issue
-4. `train_mobilenet.py` — hard-coded relative dataset path
-5. `frontend/src/home.js` — unused import removed
-6. `api/main.py` — CORS from hardcoded localhost → `["*"]`
+## Features Implemented
 
-## Frontend Refactor
-- `home.js` (696 lines) → 13 files in `constants/`, `hooks/`, `components/`, `pages/`
-- Build passes with zero warnings
-- Same functionality: upload, webcam, model selector, results, history
+### Unknown/Random Image Detection
+- **API**: `UNKNOWN_THRESHOLD = 0.70` + Shannon entropy check (`norm_entropy > 0.85`)
+- Predict endpoint returns `is_unknown: true` for non-potato-leaf images
+- Frontend/mobile show `UnknownImageCard` with warning + suggestions
+- Unknown results cannot be saved to history
 
-## Deployment (Hugging Face Spaces)
+### Grad-CAM Heatmap (Explainable AI)
+- `/gradcam` endpoint computes heatmaps for all 3 models
+- Side-by-side display for ensemble mode, collapsible section
+- Works for both single model and ensemble
+- **Web + Mobile**: identical implementation
+
+### Per-Class Probability Bar Chart
+- API returns `probabilities` dict for all 3 classes
+- Frontend/mobile display horizontal bar chart showing each class probability
+- Predicted class highlighted with full opacity, others dimmed
+
+### UI/UX Improvements
+- **Manual save**: "Save to History" button (no auto-save)
+- **Next Image**: replaces old "Clear" button
+- **Save state**: button becomes "Saved!" and disables after save
+- "Unknown" images cannot be saved
+- Animations, hover effects, polished card styles
+
+## Deployment
 - **URL**: https://AswinPanta-potatodoc.hf.space
-- **Dockerfile**: python:3.9-slim + pip install TF 2.5.0 + download models from GitHub during build
-- **Models loaded**: CNN Baseline, Transfer Learning, MobileNetV2 (all 3)
-- **Verified**: `/predict?model_id=mobilenetv2` returns predictions
-- **HF Access Token**: stored separately — ask user if needed
-- No credit card needed, always-on, 2 GB RAM free tier
-
-## Git Remotes
-- GitHub: `origin` → https://github.com/AswinPanta/Potatodoc.git (main branch pushed)
-- Hugging Face: cloned at `/tmp/hf-potatodoc/` then deleted; files uploaded via `huggingface_hub` API
+- **Dockerfile**: tensorflow/tensorflow:2.5.0 + `COPY saved_models/` (baked in, no runtime download)
+- **HF Access Token**: stored in HF Space secrets (never commit to git)
+- Models loaded from local disk → fast startup (~2s)
 
 ## Environment Notes
 - macOS 12 (Monterey), Python 3.13 system, TF 2.5.0 in `api/venv/`
-- SSL certs need `certifi` on macOS: `SSL_CERT_FILE=$(api/venv/bin/python -c "import certifi; print(certifi.where())")`
-- `brew install git-lfs` needs hours of build deps — avoid
-- Homebrew is Tier 3 on this OS version
+- SSL certs: `SSL_CERT_FILE=$(api/venv/bin/python -c "import certifi; print(certifi.where())")`
 - Frontend dev: `cd frontend && npm start`
 - Mobile: `cd mobile && npm install && npx expo start`
-
-## Known Limitations
-1. Transfer Learning Phase 2 not trained (~20-30 min/epoch on CPU, needs GPU)
-2. `find_errors.py` and `evaluate_models.py` use different test splits (can disagree on error counts)
-3. Ensemble disabled — CNN baseline bias makes it worse than individual models
-4. HF Space token is write-capable — rotate if exposed

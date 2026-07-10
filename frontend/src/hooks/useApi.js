@@ -1,0 +1,85 @@
+import { useState, useEffect } from "react";
+
+const axios = require("axios").default;
+
+// Deployed HF Space URL — switch to http://localhost:8000 for local development
+const API_BASE = "https://AswinPanta-potatodoc.hf.space";
+// const API_BASE = "http://localhost:8000";
+
+export function useModels() {
+  const [models, setModels] = useState(["cnn-baseline", "transfer-learning", "mobilenetv2", "ensemble"]);
+  const [modelNames, setModelNames] = useState({
+    "cnn-baseline": "CNN Baseline",
+    "transfer-learning": "Transfer Learning",
+    "mobilenetv2": "MobileNetV2",
+  });
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/models`);
+        setModels([...res.data.models, "ensemble"]);
+        setModelNames(res.data.modelNames);
+      } catch (err) {
+        console.error("Failed to fetch models:", err);
+      }
+    };
+    fetchModels();
+  }, []);
+
+  return { models, modelNames };
+}
+
+export function usePrediction() {
+  const [isLoading, setIsloading] = useState(false);
+  const [data, setData] = useState(null);
+
+  const sendFile = async (selectedFile, selectedModel) => {
+    if (!selectedFile) return;
+    setIsloading(true);
+    let formData = new FormData();
+    formData.append("file", selectedFile);
+    try {
+      let res = await axios({
+        method: "post",
+        url: `${API_BASE}/predict?model_id=${selectedModel}`,
+        data: formData,
+      });
+      if (res.status === 200) {
+        setData(res.data);
+        setIsloading(false);
+        return res.data;
+      }
+    } catch (err) {
+      console.error("Prediction failed:", err);
+    }
+    setIsloading(false);
+    return null;
+  };
+
+  return { data, setData, isLoading, sendFile };
+}
+
+/**
+ * Fetch Grad-CAM heatmap overlay from the API.
+ * Returns heatmap data for the given model, or all models if "ensemble".
+ */
+export async function fetchGradcam(file, modelId) {
+  if (!file) return null;
+  let formData = new FormData();
+  formData.append("file", file);
+  try {
+    let res = await axios({
+      method: "post",
+      url: `${API_BASE}/gradcam?model_id=${modelId}`,
+      data: formData,
+    });
+    if (res.status === 200 && !res.data.error) {
+      return res.data;
+    }
+    return null;
+  } catch (err) {
+    console.error("Grad-CAM failed:", err);
+    return null;
+  }
+}

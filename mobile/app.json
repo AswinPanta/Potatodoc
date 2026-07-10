@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "PotatoDoc",
+    "slug": "potato-doc",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#2E7D32"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "PotatoDoc needs camera access to take photos of potato leaves for disease diagnosis.",
+        "NSPhotoLibraryUsageDescription": "PotatoDoc needs photo library access to select images of potato leaves for disease diagnosis."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2E7D32"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "PotatoDoc needs camera access to take photos of potato leaves."
+        }
+      ],
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6e279551-1737-44bf-ab91-a4def0a766c5"
+      }
+    }
+  }
+}
