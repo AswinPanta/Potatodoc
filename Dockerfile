@@ -1,3 +1,4 @@
+# Use TensorFlow 2.5 base image (Python 3.6)
 FROM tensorflow/tensorflow:2.5.0
 
 WORKDIR /app
