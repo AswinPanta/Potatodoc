@@ -148,9 +148,91 @@ function DiseaseInfoCard({ diseaseClass }) {
   );
 }
 
+function HeatmapView({ overlayUrl, rawUrl, modelName }) {
+  const [viewMode, setViewMode] = useState("overlay"); // "overlay" | "raw" | "side-by-side"
+
+  const modes = [
+    { key: "overlay", label: "Overlay" },
+    { key: "raw", label: "Heatmap" },
+    { key: "side-by-side", label: "Side by Side" },
+  ];
+
+  return (
+    <div>
+      {/* View mode toggle */}
+      <div style={{
+        display: 'flex', gap: 6, marginBottom: 14,
+        justifyContent: 'center',
+      }}>
+        {modes.map(m => (
+          <button
+            key={m.key}
+            onClick={() => setViewMode(m.key)}
+            style={{
+              padding: '5px 14px',
+              borderRadius: 20,
+              border: viewMode === m.key ? '2px solid #2E7D32' : '1px solid #CCC',
+              backgroundColor: viewMode === m.key ? '#E8F5E9' : '#FFF',
+              color: viewMode === m.key ? '#1B5E20' : '#666',
+              fontWeight: viewMode === m.key ? 700 : 500,
+              fontSize: 12,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              letterSpacing: '0.3px',
+            }}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Image display */}
+      {viewMode === "overlay" && overlayUrl && (
+        <img src={overlayUrl} alt={`${modelName} overlay`} style={{
+          width: '100%', borderRadius: 12,
+          border: '2px solid #E8F5E9',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }} />
+      )}
+      {viewMode === "raw" && rawUrl && (
+        <img src={rawUrl} alt={`${modelName} raw heatmap`} style={{
+          width: '100%', borderRadius: 12,
+          border: '2px solid #E8F5E9',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }} />
+      )}
+      {viewMode === "side-by-side" && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <Typography variant="caption" style={{
+              display: 'block', textAlign: 'center', color: '#888',
+              marginBottom: 6, fontSize: 11, fontWeight: 600,
+            }}>Overlay</Typography>
+            <img src={overlayUrl} alt={`${modelName} overlay`} style={{
+              width: '100%', borderRadius: 10,
+              border: '2px solid #E8F5E9',
+            }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <Typography variant="caption" style={{
+              display: 'block', textAlign: 'center', color: '#888',
+              marginBottom: 6, fontSize: 11, fontWeight: 600,
+            }}>Heatmap Only</Typography>
+            <img src={rawUrl} alt={`${modelName} raw`} style={{
+              width: '100%', borderRadius: 10,
+              border: '2px solid #E8F5E9',
+            }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames }) {
   const classes = useStyles();
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [expandedModel, setExpandedModel] = useState(null);
   const hasEnsemble = selectedModel === "ensemble";
 
   if (heatmapLoading) {
@@ -167,6 +249,9 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
   }
 
   if (!heatmaps) return null;
+
+  const isEnsemble = hasEnsemble && heatmaps.heatmaps;
+  const isSingleModel = heatmaps.overlay;
 
   return (
     <div className={classes.heatmapSection}>
@@ -191,64 +276,56 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
             padding: '12px 16px', backgroundColor: '#F5F5F5', borderRadius: 10,
           }}>
             🔥 The heatmap shows which parts of the image influenced the model's decision.
-            <strong> Red areas</strong> = high importance, <strong>blue areas</strong> = low importance.
+            <strong> Red/orange areas</strong> = high importance (the model focused here).
+            Use the toggles below to switch between overlay, raw heatmap, or side-by-side comparison.
           </Typography>
 
-          {hasEnsemble && heatmaps.heatmaps ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {Object.entries(heatmaps.heatmaps).map(([modelName, overlayUrl]) => (
-                <div key={modelName} style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 14,
-                  padding: 16,
-                  border: '1px solid #E8F5E9',
-                }}>
-                  <Typography variant="caption" style={{
-                    color: '#1B5E20', fontWeight: 700, marginBottom: 10,
-                    display: 'block', fontSize: 12, textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
+          {isEnsemble ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {Object.entries(heatmaps.heatmaps).map(([modelName, h]) => {
+                const isOpen = expandedModel === modelName;
+                return (
+                  <div key={modelName} style={{
+                    borderRadius: 14,
+                    border: isOpen ? '2px solid #A5D6A7' : '1px solid #E8E8E8',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s ease',
                   }}>
-                    {modelName}
-                  </Typography>
-                  {overlayUrl ? (
-                    <img
-                      src={overlayUrl}
-                      alt={`${modelName} heatmap`}
+                    <div
+                      onClick={() => setExpandedModel(isOpen ? null : modelName)}
                       style={{
-                        width: '100%', borderRadius: 12,
-                        border: '2px solid #E8F5E9',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                        display: 'flex', justifyContent: 'space-between',
+                        alignItems: 'center', padding: '10px 16px',
+                        backgroundColor: isOpen ? '#E8F5E9' : '#FAFAFA',
+                        cursor: 'pointer',
                       }}
-                    />
-                  ) : (
-                    <div style={{
-                      padding: 24, textAlign: 'center', backgroundColor: '#FAFAFA',
-                      borderRadius: 10, color: '#999', fontSize: 13,
-                    }}>
-                      Heatmap unavailable for this model
+                    >
+                      <Typography variant="subtitle2" style={{
+                        color: '#1B5E20', fontWeight: 700, fontSize: 13,
+                      }}>
+                        <Whatshot style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4, color: '#E65100' }} />
+                        {modelName}
+                      </Typography>
+                      {isOpen ? <ExpandLess style={{ color: '#666', fontSize: 20 }} /> : <ExpandMore style={{ color: '#666', fontSize: 20 }} />}
                     </div>
-                  )}
-                </div>
-              ))}
+                    <Collapse in={isOpen}>
+                      <div style={{ padding: 16 }}>
+                        {h ? (
+                          <HeatmapView overlayUrl={h.overlay} rawUrl={h.raw} modelName={modelName} />
+                        ) : (
+                          <div style={{ padding: 24, textAlign: 'center', color: '#999', fontSize: 13 }}>
+                            Heatmap unavailable for this model
+                          </div>
+                        )}
+                      </div>
+                    </Collapse>
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            heatmaps.heatmap && (
-              <div style={{
-                backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12,
-                border: '1px solid #E8F5E9',
-              }}>
-                <img
-                  src={heatmaps.heatmap}
-                  alt="Grad-CAM heatmap overlay"
-                  style={{
-                    width: '100%', borderRadius: 10,
-                    border: '2px solid #E8F5E9',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                  }}
-                />
-              </div>
-            )
-          )}
+          ) : isSingleModel ? (
+            <HeatmapView overlayUrl={heatmaps.overlay} rawUrl={heatmaps.raw} modelName={modelNames[selectedModel] || selectedModel} />
+          ) : null}
         </div>
       </Collapse>
     </div>

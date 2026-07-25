@@ -82,19 +82,33 @@ def preprocess_for_model(image: np.ndarray, model_id: str) -> np.ndarray:
 
 # ---------- Grad-CAM Helpers ----------
 
-def find_last_conv_layer(model):
-    """Find the last Conv2D layer name in a Keras model, recursing into sub-models."""
-    last_conv = [None]
+CONV_LAYER_TYPES = (
+    tf.keras.layers.Conv2D,
+    tf.keras.layers.DepthwiseConv2D,
+    tf.keras.layers.SeparableConv2D,
+)
 
-    def _search(layer):
-        if isinstance(layer, tf.keras.layers.Conv2D):
-            last_conv[0] = layer.name
+
+def find_last_conv_layer(model):
+    """
+    Find the last convolutional layer name in a Keras model,
+    recursing into sub-models.  Supports Conv2D, DepthwiseConv2D
+    (used by MobileNetV2), and SeparableConv2D.
+    """
+    last_conv = [None]
+    last_depth = [-1]  # track depth to get truly last layer
+
+    def _search(layer, depth=0):
+        if isinstance(layer, CONV_LAYER_TYPES):
+            if depth >= last_depth[0]:
+                last_conv[0] = layer.name
+                last_depth[0] = depth
         elif hasattr(layer, 'layers'):
             for sub in layer.layers:
-                _search(sub)
+                _search(sub, depth + 1)
 
     for layer in model.layers:
-        _search(layer)
+        _search(layer, 0)
 
     return last_conv[0]
 
@@ -102,7 +116,10 @@ def find_last_conv_layer(model):
 def compute_gradcam(model, img_array, model_id):
     """
     Compute Grad-CAM heatmap for a given model and input image.
-    Returns a heatmap array of shape (H, W) in range [0, 1].
+    Returns a dict with:
+      - 'heatmap': raw heatmap array of shape (H, W) in range [0, 1]
+      - 'overlay': base64 PNG overlay of the heatmap on the original image
+      - 'heatmap_raw': base64 PNG of just the heatmap (jet colormap)
     """
     last_conv_name = find_last_conv_layer(model)
     if last_conv_name is None:
@@ -138,48 +155,71 @@ def compute_gradcam(model, img_array, model_id):
     return heatmap.numpy()
 
 
+def array_to_base64(arr: np.ndarray) -> str:
+    """Convert a numpy image array (H, W, 3) to a base64 data URI."""
+    arr = np.clip(arr, 0, 255).astype(np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(arr).save(buf, format="PNG")
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
+
+
 def generate_heatmap_overlay(heatmap, original_image):
     """
-    Generate a base64-encoded PNG of the heatmap overlaid on the original image.
-    Uses a sharper colormap and stronger blending for better visibility.
-    original_image: numpy array of shape (256, 256, 3), range [0, 255]
+    Generate two base64-encoded PNGs:
+      - 'overlay':  heatmap blended over the original image
+      - 'raw':      heatmap alone (jet colormap, no background)
+    Also returns the raw heatmap array resized to 256×256.
     """
     # Resize heatmap to match original dimensions
     heatmap_resized = tf.image.resize(
         heatmap[..., np.newaxis], (256, 256)
     ).numpy().squeeze()
-
-    # Normalize to [0, 1] and apply power transform for sharper contrast
     heatmap_norm = np.clip(heatmap_resized, 0, 1)
-    # Apply gamma to emphasize high-attention areas
+
+    # Apply gamma to emphasise high-attention areas
     heatmap_gamma = np.power(heatmap_norm, 0.7)
 
-    # Use jet colormap for the heatmap
-    heatmap_colored = cm.jet(heatmap_gamma)[:, :, :3]
-    heatmap_colored = np.uint8(255 * heatmap_colored)
+    # Jet colormap
+    colored = cm.jet(heatmap_gamma)[:, :, :3]  # (H, W, 3) in [0, 1]
+    colored_255 = np.uint8(255 * colored)
 
-    # Use a mask to only color regions with significant attention (> 30%)
-    # This makes the heatmap cleaner and more interpretable
-    mask = heatmap_norm > 0.3
+    # --- Raw heatmap (just the colormap, white background) ---
+    # Place the heatmap on a solid white background so it's visible alone
+    white_bg = np.full((256, 256, 3), 240, dtype=np.uint8)
+    alpha_mask = np.clip(heatmap_norm * 255, 0, 255).astype(np.uint8)
+    # Use the heatmap value as alpha for blending with white background
+    blended_raw = np.uint8(
+        white_bg * (1 - heatmap_norm[:, :, np.newaxis])
+        + colored_255 * heatmap_norm[:, :, np.newaxis]
+    )
+    raw_b64 = array_to_base64(blended_raw)
+
+    # --- Overlay on original image ---
+    # Multi-layer blending for a vibrant, interpretable overlay
+    # Low-attention areas show the original image clearly
+    # High-attention areas show strong red/orange overlay
+    original_float = original_image.astype(np.float32)
+
+    # Blend: overlay at 40% opacity everywhere (gives context)
+    blended = np.uint8(
+        original_float * 0.60 + colored_255 * 0.40
+    )
+
+    # Strong highlight for high-attention regions (> 50%)
+    mask = heatmap_norm > 0.50
     mask_3d = np.stack([mask] * 3, axis=-1)
 
-    # Blend: use stronger alpha in high-attention areas
-    original_pil = Image.fromarray(original_image)
-    heatmap_pil = Image.fromarray(heatmap_colored)
+    highlighted = np.uint8(
+        original_float * 0.20 + colored_255 * 0.80
+    )
 
-    # First blend the full heatmap at medium opacity for context
-    blended = Image.blend(original_pil, heatmap_pil, alpha=0.35)
+    final = np.where(mask_3d, highlighted, blended)
+    overlay_b64 = array_to_base64(final)
 
-    # Then strongly highlight high-attention areas by overlaying on top
-    highlighted = Image.blend(original_pil, heatmap_pil, alpha=0.65)
-    blended = Image.composite(highlighted, blended, Image.fromarray(np.uint8(mask * 255)))
-
-    # Convert to base64
-    buffered = io.BytesIO()
-    blended.save(buffered, format="PNG")
-    img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-    return f"data:image/png;base64,{img_base64}"
+    return {
+        'overlay': overlay_b64,
+        'raw': raw_b64,
+    }
 
 
 def get_all_heatmaps(image):
@@ -189,9 +229,13 @@ def get_all_heatmaps(image):
         try:
             processed = preprocess_for_model(np.expand_dims(image, 0), mid)
             heatmap_raw = compute_gradcam(MODELS[mid], processed, mid)
-            overlay = generate_heatmap_overlay(heatmap_raw, image)
-            heatmaps[MODEL_NAMES[mid]] = overlay
+            result = generate_heatmap_overlay(heatmap_raw, image)
+            heatmaps[MODEL_NAMES[mid]] = {
+                'overlay': result['overlay'],
+                'raw': result['raw'],
+            }
         except Exception as exc:
+            logger.warning(f"Grad-CAM failed for {mid}: {exc}")
             heatmaps[MODEL_NAMES[mid]] = None
     return heatmaps
 
@@ -403,7 +447,8 @@ async def gradcam(
 ):
     """
     Compute Grad-CAM heatmap overlay for the uploaded image.
-    Returns base64-encoded heatmap overlay image(s).
+    Returns base64-encoded heatmap images: 'overlay' (on the original image)
+    and 'raw' (heatmap alone).  For ensemble mode, returns per-model results.
     """
     try:
         image = read_file_as_image(await file.read())
@@ -421,11 +466,13 @@ async def gradcam(
             if model_id not in MODELS:
                 return {"error": "Model not found"}
             processed = preprocess_for_model(np.expand_dims(image, 0), model_id)
-            heatmap_raw = compute_gradcam(MODELS[model_id], processed, model_id)
-            overlay = generate_heatmap_overlay(heatmap_raw, image)
+            heatmap_array = compute_gradcam(MODELS[model_id], processed, model_id)
+            result = generate_heatmap_overlay(heatmap_array, image)
             return {
                 "model_id": model_id,
-                "heatmap": overlay
+                "model_name": MODEL_NAMES[model_id],
+                "overlay": result['overlay'],
+                "raw": result['raw'],
             }
     except Exception as exc:
         return {"error": f"Grad-CAM computation failed: {str(exc)}"}
