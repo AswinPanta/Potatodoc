@@ -15,9 +15,10 @@ RUN pip install --no-cache-dir \
     "matplotlib>=3.7.0,<4" \
     && rm -rf /root/.cache/pip
 
-# Copy application code and model files
+# Copy application code, model files, and frontend build
 COPY api/ ./api/
 COPY saved_models/ ./saved_models/
+COPY frontend/build/ ./frontend/build/
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app

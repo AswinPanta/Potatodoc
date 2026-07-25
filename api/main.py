@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import uvicorn
 import numpy as np
@@ -440,13 +441,16 @@ def get_models():
 
 @app.get("/health")
 def health():
-    if len(MODELS) == 3:
-        return {"status": "success", "models_loaded": list(MODELS.keys())}
+    n_models = len(MODELS)
+    if n_models >= 2:
+        return {"status": "success", "models_loaded": list(MODELS.keys()), "total_expected": 3, "total_loaded": n_models}
     return JSONResponse(
         status_code=503,
         content={
             "status": "failure",
             "models_loaded": list(MODELS.keys()),
+            "total_expected": 3,
+            "total_loaded": n_models,
             "errors": MODEL_LOAD_ERRORS,
         },
     )
@@ -591,6 +595,16 @@ async def gradcam(
     except Exception:
         logger.exception("Grad-CAM computation failed")
         return {"error": "Grad-CAM computation failed — see server logs"}
+
+
+# ---------- Frontend Static Files ----------
+# Mount the production frontend build so the API serves both backend and frontend
+frontend_build = BASE_DIR.parent / "frontend" / "build"
+if frontend_build.exists() and (frontend_build / "index.html").exists():
+    app.mount("/", StaticFiles(directory=str(frontend_build), html=True), name="frontend")
+    logger.info(f"Serving frontend from {frontend_build}")
+else:
+    logger.info("No frontend build found at %s — API-only mode", frontend_build)
 
 
 if __name__ == "__main__":
