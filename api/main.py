@@ -65,7 +65,9 @@ MODEL_NAMES = {
 
 CLASS_NAMES = ["Early Blight", "Late Blight", "Healthy"]
 UNKNOWN_CLASS = "Unknown"
-UNKNOWN_THRESHOLD = 0.70  # Max confidence below this -> "Unknown Image"
+UNKNOWN_THRESHOLD = 0.85    # Max confidence below this -> "Unknown Image"
+ENTROPY_THRESHOLD = 0.80     # Norm. entropy above this -> "Unknown Image"
+TEMPERATURE_SCALE = 1.5      # Softmax temperature for OOD calibration
 
 def read_file_as_image(data) -> np.ndarray:
     image = Image.open(BytesIO(data)).convert("RGB").resize((256, 256))
@@ -201,28 +203,75 @@ def compute_entropy(probabilities):
     probs = np.clip(probabilities, 1e-10, 1.0)
     return -np.sum(probs * np.log(probs))
 
+
+def temperature_scale(probabilities, temperature=TEMPERATURE_SCALE):
+    """
+    Apply temperature scaling to soften a probability distribution.
+
+    Given softmax outputs p_i = exp(l_i)/sum(exp(l_j)), scaling by T divides
+    the logits: p'_i = exp(l_i/T)/sum(exp(l_j/T)).  Since we only have the
+    post-softmax probabilities (not the raw logits), we use the identity:
+      p'_i = p_i^(1/T) / sum(p_j^(1/T))
+
+    T > 1 softens the distribution (more uniform), making OOD overconfidence
+    easier to detect.  T = 1 is a no-op.
+    """
+    adjusted = np.power(np.clip(probabilities, 1e-10, 1.0), 1.0 / temperature)
+    return adjusted / (np.sum(adjusted) + 1e-10)
+
+
+def is_likely_plant_leaf(image: np.ndarray) -> bool:
+    """
+    Quick pre-check: potato leaves are predominantly green.
+    Images that are not green (e.g. animals, buildings, people) are unlikely
+    to contain a potato leaf and can be rejected immediately.
+    """
+    # Avoid division by zero
+    total = np.sum(image, axis=2, keepdims=True).astype(np.float32) + 1e-10
+    # Compute per-pixel green ratio: G / (R + G + B)
+    green_ratio = image[:, :, 1].astype(np.float32) / total[:, :, 0]
+    # Average green ratio across the whole image
+    avg_green = float(np.mean(green_ratio))
+    # Also check green-dominant pixel count (% of pixels where G > R and G > B)
+    green_dominant = np.mean(
+        (image[:, :, 1].astype(np.float32) > image[:, :, 0].astype(np.float32)) &
+        (image[:, :, 1].astype(np.float32) > image[:, :, 2].astype(np.float32))
+    )
+    # Potato leaves typically have avg_green > 0.35 and green_dominant > 0.25
+    return avg_green > 0.30 and green_dominant > 0.20
+
+
 def is_unknown_image(predictions, threshold=UNKNOWN_THRESHOLD):
     """
     Check whether the model predictions indicate an unknown/non-potato-leaf image.
-    Uses two signals:
+
+    Uses two signals internally (on temperature-scaled probabilities):
       1. Max confidence below threshold → low certainty overall
       2. Normalized entropy above threshold → flat/uncertain distribution
+
+    Returns the *original* max confidence for display, but makes the
+    determination on calibrated probabilities to catch overconfident OOD images.
     """
-    max_prob = float(np.max(predictions))
+    # Apply temperature scaling to calibrate probabilities
+    # This softens overconfident predictions, making OOD detection more reliable
+    calibrated = temperature_scale(predictions)
+
+    max_prob_cal = float(np.max(calibrated))
 
     # Normalized entropy: 1.0 = uniform (max uncertainty), 0.0 = one class certain
     n_classes = len(predictions)
     max_entropy = np.log(n_classes)
-    actual_entropy = compute_entropy(predictions)
+    actual_entropy = compute_entropy(calibrated)
     norm_entropy = actual_entropy / max_entropy if max_entropy > 0 else 0.0
 
-    # High entropy + low max confidence -> likely not a potato leaf
-    is_low_conf = max_prob < threshold
-    is_high_entropy = norm_entropy > 0.85
+    is_low_conf = max_prob_cal < threshold
+    is_high_entropy = norm_entropy > ENTROPY_THRESHOLD
 
     is_unknown = is_low_conf or is_high_entropy
 
-    return is_unknown, max_prob, norm_entropy
+    # Return original (uncalibrated) max probability for display purposes
+    original_max_prob = float(np.max(predictions))
+    return is_unknown, original_max_prob, norm_entropy
 
 
 # ---------- API Routes ----------
@@ -255,6 +304,18 @@ async def predict(
         image = read_file_as_image(await file.read())
     except Exception:
         return {"error": "Invalid image file"}
+
+    # ---------- Pre-check: color-based OOD detection ----------
+    # Potato leaves are green — non-green images (animals, buildings, etc.)
+    # can be rejected immediately without running the model.
+    if not is_likely_plant_leaf(image):
+        return {
+            'class': UNKNOWN_CLASS,
+            'confidence': 0.0,
+            'is_unknown': True,
+            'entropy': 1.0,
+            'message': 'This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf.',
+        }
 
     img_batch = np.expand_dims(image, 0)
 
