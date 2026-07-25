@@ -43,7 +43,7 @@ export default function ImageInput({ onSelectFile, onWebcamStart }) {
         filesLimit={1}
         showFileNames={true}
         showAlerts={false}
-        maxFileSize={5000000}
+        maxFileSize={10000000}
         previewGridProps={{ container: { spacing: 0 } }}
         previewText="Selected image:"
       />

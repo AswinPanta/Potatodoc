@@ -1,9 +1,9 @@
 # PotatoDoc: AI-Powered Potato Leaf Disease Classification
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![React](https://img.shields.io/badge/react-17.0.2-blue.svg)](https://reactjs.org/)
-[![FastAPI](https://img.shields.io/badge/fastapi-0.68.0-blue.svg)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/fastapi-0.100+-blue.svg)](https://fastapi.tiangolo.com/)
 [![Deploy to HF Spaces](https://img.shields.io/badge/deploy-%F0%9F%A4%97%20Hugging%20Face%20Spaces-blue)](https://huggingface.co/spaces)
 
 PotatoDoc is an AI-powered web application that helps farmers and gardeners identify potato leaf diseases (Early Blight, Late Blight, or Healthy) using deep learning.
@@ -15,7 +15,7 @@ PotatoDoc is an AI-powered web application that helps farmers and gardeners iden
 - **Prediction History**: Past predictions stored locally
 
 ## Tech Stack
-- **Backend**: FastAPI, TensorFlow 2.5.0, Uvicorn
+- **Backend**: FastAPI, TensorFlow 2.15.0, Uvicorn
 - **Frontend**: React 17, Material-UI, Axios
 - **Models**: TensorFlow/Keras (CNN custom, ResNet50V2, MobileNetV2)
 
@@ -42,14 +42,14 @@ During training the following bugs were fixed:
 
 1. **`training/train_mobilenet.py`** — `x` used before assignment in data augmentation pipeline (variable name mismatch)
 2. **`api/main.py`** — `file.read()` called in synchronous `def` (blocking the async event loop); changed to `async def` with `await`
-3. **`api/main-tf-serving.py`** — Same async issue
+3. **`api/main-tf-serving.py`** — Same async issue (file later removed)
 4. **`training/train_mobilenet.py`** — Hard-coded relative dataset path `"PlantVillage"` (failed depending on CWD); replaced with `Path(__file__).resolve().parent`
 5. **`frontend/src/home.js`** — Unused import of `bg.png` removed
 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.9
+- Python 3.11
 - Node.js 16+
 - npm or yarn
 
@@ -91,9 +91,7 @@ https://your-username-potatodoc.hf.space
 ```
 potato-disease-classification/
 ├── api/                          # FastAPI backend
-│   ├── main.py                   # API server (loads 3 models)
-│   ├── main-tf-serving.py        # TF Serving client version
-│   └── venv/                     # Python venv (TF 2.5.0)
+│   └── main.py                   # API server (loads 3 models)
 ├── frontend/                     # React.js frontend
 │   └── src/
 │       ├── pages/                # Page components (HomePage)
@@ -115,11 +113,14 @@ potato-disease-classification/
 └── .dockerignore                 # Docker build context exclusions
 ```
 
-## Environment Notes
+## Environment Variables
 
-- **TensorFlow 2.5.0** — uses `tf.keras.layers.experimental.preprocessing.*` for augmentation
-- **CPU-only** — no GPU available; training is 4–7× slower than GPU
-- **SSL certs** — pre-trained weight downloads require `certifi` CA bundle on macOS
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REACT_APP_API_URL` | `https://AswinPanta-potatodoc.hf.space` | Backend URL for the web frontend |
+| `EXPO_PUBLIC_API_URL` | `https://AswinPanta-potatodoc.hf.space` | Backend URL for the mobile app |
+
+For local development, set these to `http://localhost:8000`.
 
 ## API Endpoints
 

@@ -18,7 +18,7 @@ project root/
 ├── mobile/                  # React Native (Expo) — same features as web
 ├── training/                # Training scripts + reports
 ├── saved_models/            # Models (baked into Docker image)
-├── Dockerfile               # tensorflow/tensorflow:2.5.0 base
+├── Dockerfile               # tensorflow/tensorflow:2.15.0 base (Python 3.11)
 └── README.md
 ```
 
@@ -51,12 +51,12 @@ project root/
 
 ## Deployment
 - **URL**: https://AswinPanta-potatodoc.hf.space
-- **Dockerfile**: tensorflow/tensorflow:2.5.0 + `COPY saved_models/` (baked in, no runtime download)
+- **Dockerfile**: tensorflow/tensorflow:2.15.0 + `COPY saved_models/` (baked in, no runtime download)
 - **HF Access Token**: stored in HF Space secrets (never commit to git)
 - Models loaded from local disk → fast startup (~2s)
 
 ## Environment Notes
-- macOS 12 (Monterey), Python 3.13 system, TF 2.5.0 in `api/venv/`
+- macOS 12 (Monterey), Python 3.13 system, TF 2.15.0 in Docker image
 - SSL certs: `SSL_CERT_FILE=$(api/venv/bin/python -c "import certifi; print(certifi.where())")`
 - Frontend dev: `cd frontend && npm start`
 - Mobile: `cd mobile && npm install && npx expo start`

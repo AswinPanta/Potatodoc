@@ -1,8 +1,9 @@
 from fastapi import FastAPI, File, UploadFile, Request, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import uvicorn
 import numpy as np
-from io import BytesIO
 from PIL import Image
 from pathlib import Path
 import tensorflow as tf
@@ -10,29 +11,34 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.cm as cm
-import matplotlib.pyplot as plt
 import io
 import base64
 import logging
 import sys
 import time
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 # ---------- Constants ----------
 
-MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB — must match frontend maxFileSize
 ALLOWED_MIME_PREFIXES = (b"\xff\xd8\xff", b"\x89PNG")  # JPEG, PNG
 
-# ---------- Rate Limiting ----------
-
-RATE_LIMIT_WINDOW = 60       # seconds
-RATE_LIMIT_MAX_REQUESTS = 30  # max requests per window per IP
+# Rate limiting — per-process. With 2 uvicorn workers, aggregate is 2x this value.
+# Adjusted so aggregate ~30 req/min.
+RATE_LIMIT_PER_WORKER = 15
+RATE_LIMIT_WINDOW = 60
 
 # In-memory request tracker: {client_ip: deque([timestamp, ...])}
-_request_tracker = defaultdict(lambda: deque(maxlen=RATE_LIMIT_MAX_REQUESTS))
+_request_tracker = defaultdict(lambda: deque(maxlen=RATE_LIMIT_PER_WORKER))
+
+# Cache for last conv layer names (computed once per model)
+_conv_layer_cache = {}
+
+_executor = ThreadPoolExecutor(max_workers=4)
 
 
 def _prune_tracker():
@@ -53,6 +59,8 @@ def check_rate_limit(request: Request):
     """
     Check whether the client has exceeded the rate limit.
     Raises HTTPException (429) if over the limit.
+    Note: rate limiter is per-process. With 2 uvicorn workers the
+    effective aggregate limit is 2x RATE_LIMIT_PER_WORKER.
     """
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
@@ -63,7 +71,7 @@ def check_rate_limit(request: Request):
     while timestamps and timestamps[0] < cutoff:
         timestamps.popleft()
 
-    if len(timestamps) >= RATE_LIMIT_MAX_REQUESTS:
+    if len(timestamps) >= RATE_LIMIT_PER_WORKER:
         retry_after = int(timestamps[0] + RATE_LIMIT_WINDOW - now)
         logger.warning(f"Rate limit hit for {client_ip} — retry after {retry_after}s")
         raise HTTPException(
@@ -77,6 +85,7 @@ def check_rate_limit(request: Request):
     # Occasionally prune the full tracker (every 100 requests)
     if len(_request_tracker) > 100 and len(timestamps) == 1:
         _prune_tracker()
+
 
 # ---------- File Validation ----------
 
@@ -93,7 +102,19 @@ def validate_image(data: bytes) -> bytes:
 
 # ---------- App Setup ----------
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: models are loaded at module level (before this runs)
+    yield
+    # Shutdown: clean up model references and TF session
+    logger.info("Shutting down — clearing model references")
+    MODELS.clear()
+    tf.keras.backend.clear_session()
+    _executor.shutdown(wait=False)
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -102,7 +123,6 @@ app.add_middleware(
         "http://localhost:3000",                    # React dev server
         "http://127.0.0.1:3000",
     ],
-    allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept"],
 )
@@ -169,7 +189,7 @@ ENTROPY_THRESHOLD = 0.80     # Norm. entropy above this -> "Unknown Image"
 TEMPERATURE_SCALE = 1.5      # Softmax temperature for OOD calibration
 
 def read_file_as_image(data) -> np.ndarray:
-    image = Image.open(BytesIO(data)).convert("RGB").resize((256, 256))
+    image = Image.open(io.BytesIO(data)).convert("RGB").resize((256, 256))
     return np.array(image)
 
 def preprocess_for_model(image: np.ndarray, model_id: str) -> np.ndarray:
@@ -178,6 +198,7 @@ def preprocess_for_model(image: np.ndarray, model_id: str) -> np.ndarray:
     # Baseline and transfer-learning models already contain an internal
     # Rescaling(1./255) layer, so they expect raw [0, 255] inputs.
     return image
+
 
 # ---------- Grad-CAM Helpers ----------
 
@@ -188,14 +209,18 @@ CONV_LAYER_TYPES = (
 )
 
 
-def find_last_conv_layer(model):
+def find_last_conv_layer(model, model_id=None):
     """
     Find the last convolutional layer name in a Keras model,
     recursing into sub-models.  Supports Conv2D, DepthwiseConv2D
     (used by MobileNetV2), and SeparableConv2D.
+    Results are cached by model_id to avoid re-traversing the graph.
     """
+    if model_id and model_id in _conv_layer_cache:
+        return _conv_layer_cache[model_id]
+
     last_conv = [None]
-    last_depth = [-1]  # track depth to get truly last layer
+    last_depth = [-1]
 
     def _search(layer, depth=0):
         if isinstance(layer, CONV_LAYER_TYPES):
@@ -209,28 +234,22 @@ def find_last_conv_layer(model):
     for layer in model.layers:
         _search(layer, 0)
 
-    return last_conv[0]
+    result = last_conv[0]
+    if model_id:
+        _conv_layer_cache[model_id] = result
+    return result
 
 
 def compute_gradcam(model, img_array, model_id):
-    """
-    Compute Grad-CAM heatmap for a given model and input image.
-    Returns a dict with:
-      - 'heatmap': raw heatmap array of shape (H, W) in range [0, 1]
-      - 'overlay': base64 PNG overlay of the heatmap on the original image
-      - 'heatmap_raw': base64 PNG of just the heatmap (jet colormap)
-    """
-    last_conv_name = find_last_conv_layer(model)
+    last_conv_name = find_last_conv_layer(model, model_id)
     if last_conv_name is None:
         raise ValueError(f"Could not find a Conv2D layer in model '{model_id}'")
 
-    # Build a model that outputs both conv activations and final predictions
     grad_model = tf.keras.models.Model(
         inputs=model.input,
         outputs=[model.get_layer(last_conv_name).output, model.output]
     )
 
-    # Convert to tensor and ensure float32
     img_tensor = tf.cast(img_array, tf.float32)
 
     with tf.GradientTape() as tape:
@@ -242,13 +261,11 @@ def compute_gradcam(model, img_array, model_id):
     grads = tape.gradient(loss, conv_outputs)
     pooled_grads = tf.reduce_mean(grads, axis=(1, 2))
 
-    # Weight feature maps by importance
     conv_outputs = conv_outputs[0]
     heatmap = tf.reduce_sum(
         tf.multiply(pooled_grads, conv_outputs), axis=-1
     )
 
-    # ReLU + normalize
     heatmap = tf.maximum(heatmap, 0) / (tf.reduce_max(heatmap) + tf.keras.backend.epsilon())
 
     return heatmap.numpy()
@@ -267,26 +284,18 @@ def generate_heatmap_overlay(heatmap, original_image):
     Generate two base64-encoded PNGs:
       - 'overlay':  heatmap blended over the original image
       - 'raw':      heatmap alone (jet colormap, no background)
-    Also returns the raw heatmap array resized to 256×256.
     """
-    # Resize heatmap to match original dimensions
     heatmap_resized = tf.image.resize(
         heatmap[..., np.newaxis], (256, 256)
     ).numpy().squeeze()
     heatmap_norm = np.clip(heatmap_resized, 0, 1)
-
-    # Apply gamma to emphasise high-attention areas
     heatmap_gamma = np.power(heatmap_norm, 0.7)
 
-    # Jet colormap
-    colored = cm.jet(heatmap_gamma)[:, :, :3]  # (H, W, 3) in [0, 1]
+    colored = cm.jet(heatmap_gamma)[:, :, :3]
     colored_255 = np.uint8(255 * colored)
 
-    # --- Raw heatmap (just the colormap, white background) ---
-    # Place the heatmap on a solid white background so it's visible alone
+    # --- Raw heatmap (colormap on white background) ---
     white_bg = np.full((256, 256, 3), 240, dtype=np.uint8)
-    alpha_mask = np.clip(heatmap_norm * 255, 0, 255).astype(np.uint8)
-    # Use the heatmap value as alpha for blending with white background
     blended_raw = np.uint8(
         white_bg * (1 - heatmap_norm[:, :, np.newaxis])
         + colored_255 * heatmap_norm[:, :, np.newaxis]
@@ -294,24 +303,12 @@ def generate_heatmap_overlay(heatmap, original_image):
     raw_b64 = array_to_base64(blended_raw)
 
     # --- Overlay on original image ---
-    # Multi-layer blending for a vibrant, interpretable overlay
-    # Low-attention areas show the original image clearly
-    # High-attention areas show strong red/orange overlay
     original_float = original_image.astype(np.float32)
 
-    # Blend: overlay at 40% opacity everywhere (gives context)
-    blended = np.uint8(
-        original_float * 0.60 + colored_255 * 0.40
-    )
-
-    # Strong highlight for high-attention regions (> 50%)
+    blended = np.uint8(original_float * 0.60 + colored_255 * 0.40)
     mask = heatmap_norm > 0.50
     mask_3d = np.stack([mask] * 3, axis=-1)
-
-    highlighted = np.uint8(
-        original_float * 0.20 + colored_255 * 0.80
-    )
-
+    highlighted = np.uint8(original_float * 0.20 + colored_255 * 0.80)
     final = np.where(mask_3d, highlighted, blended)
     overlay_b64 = array_to_base64(final)
 
@@ -348,17 +345,6 @@ def compute_entropy(probabilities):
 
 
 def temperature_scale(probabilities, temperature=TEMPERATURE_SCALE):
-    """
-    Apply temperature scaling to soften a probability distribution.
-
-    Given softmax outputs p_i = exp(l_i)/sum(exp(l_j)), scaling by T divides
-    the logits: p'_i = exp(l_i/T)/sum(exp(l_j/T)).  Since we only have the
-    post-softmax probabilities (not the raw logits), we use the identity:
-      p'_i = p_i^(1/T) / sum(p_j^(1/T))
-
-    T > 1 softens the distribution (more uniform), making OOD overconfidence
-    easier to detect.  T = 1 is a no-op.
-    """
     adjusted = np.power(np.clip(probabilities, 1e-10, 1.0), 1.0 / temperature)
     return adjusted / (np.sum(adjusted) + 1e-10)
 
@@ -366,17 +352,13 @@ def temperature_scale(probabilities, temperature=TEMPERATURE_SCALE):
 def is_likely_plant_leaf(image: np.ndarray) -> bool:
     """
     Two-layer pre-check before model inference.
-    
+
     Layer 1 — Color: Potato leaves are predominantly green.
-      Rejects non-green images (animals, buildings, people) immediately.
-    
     Layer 2 — Texture: Organic leaves have irregular, detailed textures.
-      Rejects uniform/synthetic surfaces (walls, plastic) even if green.
-    
     Layer 3 (downstream in is_unknown_image): Temperature-scaled confidence
       and entropy threshold to catch overconfident OOD predictions.
     """
-    # ---- Layer 1: Color (green ratio) ----
+    # Layer 1: Color (green ratio)
     total = np.sum(image, axis=2, keepdims=True).astype(np.float32) + 1e-10
     green_ratio = image[:, :, 1].astype(np.float32) / total[:, :, 0]
     avg_green = float(np.mean(green_ratio))
@@ -388,45 +370,21 @@ def is_likely_plant_leaf(image: np.ndarray) -> bool:
     if not passes_color:
         return False
 
-    # ---- Layer 2: Texture (organic vs. synthetic) ----
-    # Convert to grayscale and compute intensity variation.
-    # Potato leaves have high intensity variation (veins, spots, edges).
-    # Synthetic green objects (walls, plastic) have low variation.
+    # Layer 2: Texture (organic vs. synthetic)
     gray = np.mean(image.astype(np.float32), axis=2)
-    # Gradient-based edge magnitude
     gy, gx = np.gradient(gray)
     edge_mag = np.sqrt(gx**2 + gy**2)
-    
-    # Texture features
-    intensity_std = float(np.std(gray))          # overall tonal variation
-    texture_complexity = float(np.std(edge_mag)) # edge detail variation
-    
-    # Thresholds (empirically tuned):
-    # - intensity_std < 1.5 → very uniform surface (painted wall, plastic)
-    # - texture_complexity < 0.8 → smooth, little detail
+    intensity_std = float(np.std(gray))
+    texture_complexity = float(np.std(edge_mag))
     passes_texture = intensity_std > 1.5 and texture_complexity > 0.8
 
     return passes_texture
 
 
 def is_unknown_image(predictions, threshold=UNKNOWN_THRESHOLD):
-    """
-    Check whether the model predictions indicate an unknown/non-potato-leaf image.
-
-    Uses two signals internally (on temperature-scaled probabilities):
-      1. Max confidence below threshold → low certainty overall
-      2. Normalized entropy above threshold → flat/uncertain distribution
-
-    Returns the *original* max confidence for display, but makes the
-    determination on calibrated probabilities to catch overconfident OOD images.
-    """
-    # Apply temperature scaling to calibrate probabilities
-    # This softens overconfident predictions, making OOD detection more reliable
     calibrated = temperature_scale(predictions)
-
     max_prob_cal = float(np.max(calibrated))
 
-    # Normalized entropy: 1.0 = uniform (max uncertainty), 0.0 = one class certain
     n_classes = len(predictions)
     max_entropy = np.log(n_classes)
     actual_entropy = compute_entropy(calibrated)
@@ -437,30 +395,97 @@ def is_unknown_image(predictions, threshold=UNKNOWN_THRESHOLD):
 
     is_unknown = is_low_conf or is_high_entropy
 
-    # Return original (uncalibrated) max probability for display purposes
     original_max_prob = float(np.max(predictions))
     return is_unknown, original_max_prob, norm_entropy
+
+
+# ---------- Ensemble Prediction Helper ----------
+
+def _predict_single_model(mid, img_batch):
+    """Run prediction on a single model (runs in thread pool)."""
+    processed = preprocess_for_model(img_batch, mid)
+    return MODELS[mid].predict(processed, verbose=0)[0]
+
+
+def _run_ensemble(img_batch):
+    """Run all models in parallel using thread pool and return averaged predictions."""
+    model_ids = list(MODELS.keys())
+    all_predictions = list(_executor.map(
+        lambda mid: _predict_single_model(mid, img_batch), model_ids
+    ))
+    avg_predictions = np.mean(all_predictions, axis=0)
+    return model_ids, all_predictions, avg_predictions
 
 
 # ---------- API Routes ----------
 
 @app.get("/ping")
 def ping():
-  return "Hello, I am alive"
+    return "Hello, I am alive"
+
 
 @app.get("/models")
 def get_models():
-  return {"models": list(MODELS.keys()), "modelNames": MODEL_NAMES}
+    return {"models": list(MODELS.keys()), "modelNames": MODEL_NAMES}
+
 
 @app.get("/health")
 def health():
     if len(MODELS) == 3:
         return {"status": "success", "models_loaded": list(MODELS.keys())}
-    return {
-        "status": "failure",
-        "models_loaded": list(MODELS.keys()),
-        "errors": MODEL_LOAD_ERRORS,
+    return JSONResponse(
+        status_code=503,
+        content={
+            "status": "failure",
+            "models_loaded": list(MODELS.keys()),
+            "errors": MODEL_LOAD_ERRORS,
+        },
+    )
+
+
+def _build_unknown_response(message, max_conf, norm_entropy, model_ids=None, all_predictions=None):
+    """Build a consistent unknown response with all expected keys."""
+    resp = {
+        'class': UNKNOWN_CLASS,
+        'confidence': max_conf,
+        'is_unknown': True,
+        'entropy': float(norm_entropy),
+        'probabilities': {},
+        'message': message,
     }
+    if model_ids and all_predictions:
+        resp['individual'] = [
+            {
+                "model": MODEL_NAMES[model_ids[idx]],
+                "class": CLASS_NAMES[np.argmax(pred)],
+                "confidence": float(np.max(pred)),
+            }
+            for idx, pred in enumerate(all_predictions)
+        ]
+    return resp
+
+
+def _build_success_response(predicted_class, confidence, probabilities, model_ids=None, all_predictions=None):
+    """Build a consistent success response."""
+    resp = {
+        'class': predicted_class,
+        'confidence': confidence,
+        'probabilities': {
+            CLASS_NAMES[i]: float(probabilities[i])
+            for i in range(len(CLASS_NAMES))
+        },
+        'is_unknown': False,
+    }
+    if model_ids and all_predictions:
+        resp['individual'] = [
+            {
+                "model": MODEL_NAMES[model_ids[idx]],
+                "class": CLASS_NAMES[np.argmax(pred)],
+                "confidence": float(np.max(pred)),
+            }
+            for idx, pred in enumerate(all_predictions)
+        ]
+    return resp
 
 
 @app.post("/predict")
@@ -475,99 +500,49 @@ async def predict(
         validate_image(raw)
         image = read_file_as_image(raw)
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception:
-        return {"error": "Invalid image file"}
+        raise HTTPException(status_code=400, detail="Invalid image file")
 
-    # ---------- Pre-check: color-based OOD detection ----------
-    # Potato leaves are green — non-green images (animals, buildings, etc.)
-    # can be rejected immediately without running the model.
+    # Pre-check: color-based OOD detection
     if not is_likely_plant_leaf(image):
-        return {
-            'class': UNKNOWN_CLASS,
-            'confidence': 0.0,
-            'is_unknown': True,
-            'entropy': 1.0,
-            'message': 'This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf.',
-        }
+        return _build_unknown_response(
+            'This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf.',
+            0.0, 1.0,
+        )
 
     img_batch = np.expand_dims(image, 0)
 
     if model_id == "ensemble":
-        model_ids = list(MODELS.keys())
-        all_predictions = []
-        for mid in model_ids:
-            processed = preprocess_for_model(img_batch, mid)
-            all_predictions.append(MODELS[mid].predict(processed)[0])
-        avg_predictions = np.mean(all_predictions, axis=0)
-
-        # Check for unknown image
+        model_ids, all_predictions, avg_predictions = _run_ensemble(img_batch)
         unknown, max_conf, norm_entropy = is_unknown_image(avg_predictions)
         if unknown:
-            return {
-                'class': UNKNOWN_CLASS,
-                'confidence': max_conf,
-                'is_unknown': True,
-                'entropy': float(norm_entropy),
-                'message': 'This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf.',
-                'individual': [
-                    {
-                        "model": MODEL_NAMES[model_ids[idx]],
-                        "class": CLASS_NAMES[np.argmax(pred)],
-                        "confidence": float(np.max(pred))
-                    }
-                    for idx, pred in enumerate(all_predictions)
-                ]
-            }
-
+            return _build_unknown_response(
+                'This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf.',
+                max_conf, float(norm_entropy),
+                model_ids, all_predictions,
+            )
         predicted_class = CLASS_NAMES[np.argmax(avg_predictions)]
-        confidence = float(np.max(avg_predictions))
-        individual = [
-            {
-                "model": MODEL_NAMES[model_ids[idx]],
-                "class": CLASS_NAMES[np.argmax(pred)],
-                "confidence": float(np.max(pred))
-            }
-            for idx, pred in enumerate(all_predictions)
-        ]
-        return {
-            'class': predicted_class,
-            'confidence': confidence,
-            'probabilities': {
-                CLASS_NAMES[i]: float(avg_predictions[i])
-                for i in range(len(CLASS_NAMES))
-            },
-            'individual': individual,
-            'is_unknown': False
-        }
+        return _build_success_response(
+            predicted_class, float(np.max(avg_predictions)), avg_predictions,
+            model_ids, all_predictions,
+        )
     else:
         if model_id not in MODELS:
-            return {"error": "Model not found"}
+            raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
         processed = preprocess_for_model(img_batch, model_id)
-        model = MODELS[model_id]
-        predictions = model.predict(processed)
+        predictions = MODELS[model_id].predict(processed, verbose=0)
 
         unknown, max_conf, norm_entropy = is_unknown_image(predictions[0])
         if unknown:
-            return {
-                'class': UNKNOWN_CLASS,
-                'confidence': max_conf,
-                'is_unknown': True,
-                'entropy': float(norm_entropy),
-                'message': 'This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf.'
-            }
-
+            return _build_unknown_response(
+                'This does not appear to be a potato leaf. Please upload a clear photo of a potato leaf.',
+                max_conf, float(norm_entropy),
+            )
         predicted_class = CLASS_NAMES[np.argmax(predictions[0])]
-        confidence = float(np.max(predictions[0]))
-        return {
-            'class': predicted_class,
-            'confidence': confidence,
-            'probabilities': {
-                CLASS_NAMES[i]: float(predictions[0][i])
-                for i in range(len(CLASS_NAMES))
-            },
-            'is_unknown': False
-        }
+        return _build_success_response(
+            predicted_class, float(np.max(predictions[0])), predictions[0],
+        )
 
 
 @app.post("/gradcam")
@@ -576,31 +551,23 @@ async def gradcam(
     file: UploadFile = File(...),
     model_id: str = "ensemble"
 ):
-    """
-    Compute Grad-CAM heatmap overlay for the uploaded image.
-    Returns base64-encoded heatmap images: 'overlay' (on the original image)
-    and 'raw' (heatmap alone).  For ensemble mode, returns per-model results.
-    """
     check_rate_limit(request)
     try:
         raw = await file.read()
         validate_image(raw)
         image = read_file_as_image(raw)
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception:
-        return {"error": "Invalid image file"}
+        raise HTTPException(status_code=400, detail="Invalid image file")
 
     try:
         if model_id == "ensemble":
             heatmaps = get_all_heatmaps(image)
-            return {
-                "model_id": model_id,
-                "heatmaps": heatmaps
-            }
+            return {"model_id": model_id, "heatmaps": heatmaps}
         else:
             if model_id not in MODELS:
-                return {"error": "Model not found"}
+                raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
             processed = preprocess_for_model(np.expand_dims(image, 0), model_id)
             heatmap_array = compute_gradcam(MODELS[model_id], processed, model_id)
             result = generate_heatmap_overlay(heatmap_array, image)
@@ -610,18 +577,11 @@ async def gradcam(
                 "overlay": result['overlay'],
                 "raw": result['raw'],
             }
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Grad-CAM computation failed")
         return {"error": "Grad-CAM computation failed — see server logs"}
-
-
-# ---------- Graceful Shutdown ----------
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("Shutting down — clearing model references")
-    MODELS.clear()
-    tf.keras.backend.clear_session()
 
 
 if __name__ == "__main__":
