@@ -266,23 +266,48 @@ def temperature_scale(probabilities, temperature=TEMPERATURE_SCALE):
 
 def is_likely_plant_leaf(image: np.ndarray) -> bool:
     """
-    Quick pre-check: potato leaves are predominantly green.
-    Images that are not green (e.g. animals, buildings, people) are unlikely
-    to contain a potato leaf and can be rejected immediately.
+    Two-layer pre-check before model inference.
+    
+    Layer 1 — Color: Potato leaves are predominantly green.
+      Rejects non-green images (animals, buildings, people) immediately.
+    
+    Layer 2 — Texture: Organic leaves have irregular, detailed textures.
+      Rejects uniform/synthetic surfaces (walls, plastic) even if green.
+    
+    Layer 3 (downstream in is_unknown_image): Temperature-scaled confidence
+      and entropy threshold to catch overconfident OOD predictions.
     """
-    # Avoid division by zero
+    # ---- Layer 1: Color (green ratio) ----
     total = np.sum(image, axis=2, keepdims=True).astype(np.float32) + 1e-10
-    # Compute per-pixel green ratio: G / (R + G + B)
     green_ratio = image[:, :, 1].astype(np.float32) / total[:, :, 0]
-    # Average green ratio across the whole image
     avg_green = float(np.mean(green_ratio))
-    # Also check green-dominant pixel count (% of pixels where G > R and G > B)
-    green_dominant = np.mean(
+    green_dominant = float(np.mean(
         (image[:, :, 1].astype(np.float32) > image[:, :, 0].astype(np.float32)) &
         (image[:, :, 1].astype(np.float32) > image[:, :, 2].astype(np.float32))
-    )
-    # Potato leaves typically have avg_green > 0.35 and green_dominant > 0.25
-    return avg_green > 0.30 and green_dominant > 0.20
+    ))
+    passes_color = avg_green > 0.30 and green_dominant > 0.20
+    if not passes_color:
+        return False
+
+    # ---- Layer 2: Texture (organic vs. synthetic) ----
+    # Convert to grayscale and compute intensity variation.
+    # Potato leaves have high intensity variation (veins, spots, edges).
+    # Synthetic green objects (walls, plastic) have low variation.
+    gray = np.mean(image.astype(np.float32), axis=2)
+    # Gradient-based edge magnitude
+    gy, gx = np.gradient(gray)
+    edge_mag = np.sqrt(gx**2 + gy**2)
+    
+    # Texture features
+    intensity_std = float(np.std(gray))          # overall tonal variation
+    texture_complexity = float(np.std(edge_mag)) # edge detail variation
+    
+    # Thresholds (empirically tuned):
+    # - intensity_std < 1.5 → very uniform surface (painted wall, plastic)
+    # - texture_complexity < 0.8 → smooth, little detail
+    passes_texture = intensity_std > 1.5 and texture_complexity > 0.8
+
+    return passes_texture
 
 
 def is_unknown_image(predictions, threshold=UNKNOWN_THRESHOLD):
