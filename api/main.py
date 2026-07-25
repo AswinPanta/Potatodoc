@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import numpy as np
@@ -15,17 +15,98 @@ import io
 import base64
 import logging
 import sys
+import time
+from collections import defaultdict, deque
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# ---------- Constants ----------
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_MIME_PREFIXES = (b"\xff\xd8\xff", b"\x89PNG")  # JPEG, PNG
+
+# ---------- Rate Limiting ----------
+
+RATE_LIMIT_WINDOW = 60       # seconds
+RATE_LIMIT_MAX_REQUESTS = 30  # max requests per window per IP
+
+# In-memory request tracker: {client_ip: deque([timestamp, ...])}
+_request_tracker = defaultdict(lambda: deque(maxlen=RATE_LIMIT_MAX_REQUESTS))
+
+
+def _prune_tracker():
+    """Remove expired entries from all tracked IPs."""
+    now = time.time()
+    cutoff = now - RATE_LIMIT_WINDOW
+    stale_ips = []
+    for ip, timestamps in list(_request_tracker.items()):
+        while timestamps and timestamps[0] < cutoff:
+            timestamps.popleft()
+        if not timestamps:
+            stale_ips.append(ip)
+    for ip in stale_ips:
+        del _request_tracker[ip]
+
+
+def check_rate_limit(request: Request):
+    """
+    Check whether the client has exceeded the rate limit.
+    Raises HTTPException (429) if over the limit.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    cutoff = now - RATE_LIMIT_WINDOW
+
+    # Prune old entries for this IP only (fast path)
+    timestamps = _request_tracker[client_ip]
+    while timestamps and timestamps[0] < cutoff:
+        timestamps.popleft()
+
+    if len(timestamps) >= RATE_LIMIT_MAX_REQUESTS:
+        retry_after = int(timestamps[0] + RATE_LIMIT_WINDOW - now)
+        logger.warning(f"Rate limit hit for {client_ip} — retry after {retry_after}s")
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Try again in {retry_after} seconds.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    timestamps.append(now)
+
+    # Occasionally prune the full tracker (every 100 requests)
+    if len(_request_tracker) > 100 and len(timestamps) == 1:
+        _prune_tracker()
+
+# ---------- File Validation ----------
+
+def validate_image(data: bytes) -> bytes:
+    """Check size + magic bytes before processing. Returns the data if valid."""
+    if len(data) > MAX_UPLOAD_SIZE:
+        raise ValueError(f"File too large ({len(data)} bytes, max {MAX_UPLOAD_SIZE})")
+    is_valid_mime = any(data.startswith(sig) for sig in ALLOWED_MIME_PREFIXES)
+    is_valid_mime = is_valid_mime or (data[:4] == b"RIFF" and b"WEBP" in data[:12])
+    if not is_valid_mime:
+        raise ValueError("Unsupported format — use JPEG, PNG, or WebP")
+    return data
+
+
+# ---------- App Setup ----------
+
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        "https://AswinPanta-potatodoc.hf.space",  # HF Space (production)
+        "http://localhost:3000",                    # React dev server
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -366,11 +447,17 @@ def health():
 
 @app.post("/predict")
 async def predict(
+    request: Request,
     file: UploadFile = File(...),
     model_id: str = "ensemble"
 ):
+    check_rate_limit(request)
     try:
-        image = read_file_as_image(await file.read())
+        raw = await file.read()
+        validate_image(raw)
+        image = read_file_as_image(raw)
+    except ValueError as e:
+        return {"error": str(e)}
     except Exception:
         return {"error": "Invalid image file"}
 
@@ -467,6 +554,7 @@ async def predict(
 
 @app.post("/gradcam")
 async def gradcam(
+    request: Request,
     file: UploadFile = File(...),
     model_id: str = "ensemble"
 ):
@@ -475,8 +563,13 @@ async def gradcam(
     Returns base64-encoded heatmap images: 'overlay' (on the original image)
     and 'raw' (heatmap alone).  For ensemble mode, returns per-model results.
     """
+    check_rate_limit(request)
     try:
-        image = read_file_as_image(await file.read())
+        raw = await file.read()
+        validate_image(raw)
+        image = read_file_as_image(raw)
+    except ValueError as e:
+        return {"error": str(e)}
     except Exception:
         return {"error": "Invalid image file"}
 
@@ -499,8 +592,18 @@ async def gradcam(
                 "overlay": result['overlay'],
                 "raw": result['raw'],
             }
-    except Exception as exc:
-        return {"error": f"Grad-CAM computation failed: {str(exc)}"}
+    except Exception:
+        logger.exception("Grad-CAM computation failed")
+        return {"error": "Grad-CAM computation failed — see server logs"}
+
+
+# ---------- Graceful Shutdown ----------
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down — clearing model references")
+    MODELS.clear()
+    tf.keras.backend.clear_session()
 
 
 if __name__ == "__main__":
