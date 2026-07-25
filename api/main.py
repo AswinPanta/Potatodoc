@@ -442,7 +442,8 @@ def get_models():
 @app.get("/health")
 def health():
     n_models = len(MODELS)
-    if n_models >= 2:
+    n_models = len(MODELS)
+    if n_models == 3:
         return {"status": "success", "models_loaded": list(MODELS.keys()), "total_expected": 3, "total_loaded": n_models}
     return JSONResponse(
         status_code=503,
