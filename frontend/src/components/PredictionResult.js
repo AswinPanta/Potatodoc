@@ -250,8 +250,10 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
 
   if (!heatmaps) return null;
 
+  // Backward compatibility: handle both old API (heatmap key) and new API (overlay/raw keys)
+  const isOldFormat = heatmaps.heatmap && typeof heatmaps.heatmap === 'string';
   const isEnsemble = hasEnsemble && heatmaps.heatmaps;
-  const isSingleModel = heatmaps.overlay;
+  const isSingleModel = isOldFormat || heatmaps.overlay;
 
   return (
     <div className={classes.heatmapSection}>
@@ -324,7 +326,11 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
               })}
             </div>
           ) : isSingleModel ? (
-            <HeatmapView overlayUrl={heatmaps.overlay} rawUrl={heatmaps.raw} modelName={modelNames[selectedModel] || selectedModel} />
+            <HeatmapView
+              overlayUrl={isOldFormat ? heatmaps.heatmap : heatmaps.overlay}
+              rawUrl={isOldFormat ? heatmaps.heatmap : heatmaps.raw}
+              modelName={modelNames[selectedModel] || selectedModel}
+            />
           ) : null}
         </div>
       </Collapse>
