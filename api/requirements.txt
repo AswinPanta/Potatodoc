@@ -1,16 +1,10 @@
-# Install order matters for this stack on Python 3.9:
-#   1) `pip install tensorflow==2.5.0`  (pins numpy~=1.19.2 and typing-extensions~=3.7.4)
-#   2) `pip install -r requirements.txt`  (fastapi/starlette/pydantic transitively
-#                                          pull a newer typing-extensions, overriding 3.7.4)
-#   3) If pip ever reports typing-extensions back at 3.x, run
-#      `pip install "typing-extensions>4"` to force >=4 for starlette/fastapi.
-# TF 2.5 emits a UserWarning about typing-extensions but runs fine at runtime.
+# Dockerfile is the single source of truth for production dependencies.
+# This requirements.txt is for local development only — match versions here.
+# The Docker image uses tensorflow/tensorflow:2.15.0 (Python 3.11).
 
-tensorflow==2.5.0
-numpy>=1.19.2,<1.20
-fastapi==0.79.1
-starlette==0.19.1
-uvicorn==0.39.0
-python-multipart==0.0.5
-Pillow>=10.0.0
-matplotlib>=3.5.0
+numpy>=1.24
+fastapi>=0.100.0,<1
+uvicorn>=0.24.0,<1
+python-multipart>=0.0.6,<1
+Pillow>=10.0.0,<11
+matplotlib>=3.7.0,<4
