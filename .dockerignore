@@ -10,5 +10,13 @@ frontend/
 mobile/
 training/
 PlantVillage/
+
+# Python virtual environments
+api/venv/
+
+# Config, docs, checkpoints
 *.md
 *.config.example
+.env*
+*.weights.h5
+*.h5

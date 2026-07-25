@@ -21,8 +21,6 @@ from collections import defaultdict, deque
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
-
 # ---------- Constants ----------
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -108,6 +106,26 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept"],
 )
+
+# ---------- Request Logging Middleware ----------
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = int((time.time() - start) * 1000)
+    logger.info(f"{request.method} {request.url.path} → {response.status_code} ({duration}ms)")
+    return response
+
+
+# ---------- Security Headers Middleware ----------
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+
 
 BASE_DIR = Path(__file__).resolve().parent
 

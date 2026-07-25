@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 
 const axios = require("axios").default;
 
-// Deployed HF Space URL — switch to http://localhost:8000 for local development
-const API_BASE = "https://AswinPanta-potatodoc.hf.space";
-// const API_BASE = "http://localhost:8000";
+const API_BASE = process.env.REACT_APP_API_URL || "https://AswinPanta-potatodoc.hf.space";
 
 export function useModels() {
   const [models, setModels] = useState(["cnn-baseline", "transfer-learning", "mobilenetv2", "ensemble"]);

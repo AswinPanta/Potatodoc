@@ -25,7 +25,8 @@ project root/
 ## Features Implemented
 
 ### Unknown/Random Image Detection
-- **API**: `UNKNOWN_THRESHOLD = 0.70` + Shannon entropy check (`norm_entropy > 0.85`)
+- **API**: `UNKNOWN_THRESHOLD = 0.85` + Shannon entropy check (`norm_entropy > 0.80`)
+- **Layers**: Color check (green ratio) → Texture check (intensity_std > 1.5) → Temperature scaling (T=1.5) → Confidence/entropy threshold
 - Predict endpoint returns `is_unknown: true` for non-potato-leaf images
 - Frontend/mobile show `UnknownImageCard` with warning + suggestions
 - Unknown results cannot be saved to history

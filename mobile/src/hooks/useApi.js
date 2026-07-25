@@ -2,9 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { File, UploadType } from "expo-file-system";
 
-// Deployed HF Space URL — switch to http://localhost:8000 for local development
-const API_BASE = "https://AswinPanta-potatodoc.hf.space";
-// const API_BASE = "http://localhost:8000";
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "https://AswinPanta-potatodoc.hf.space";
 
 export const MODEL_IDS = ["cnn-baseline", "transfer-learning", "mobilenetv2"];
 
@@ -32,9 +30,13 @@ async function checkConnectivity() {
  * Native's broken FormData / Blob implementation entirely.
  */
 async function uploadNative(fileUri, endpointPath, queryParams = "") {
+  const TIMEOUT_MS = 30000; // 30-second timeout
+
   try {
     const file = new File(fileUri);
-    const result = await file.upload(
+
+    // Race the upload against a timeout
+    const uploadPromise = file.upload(
       `${API_BASE}${endpointPath}${queryParams}`,
       {
         uploadType: UploadType.MULTIPART,
@@ -42,6 +44,13 @@ async function uploadNative(fileUri, endpointPath, queryParams = "") {
         httpMethod: "POST",
       }
     );
+
+    const result = await Promise.race([
+      uploadPromise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timed out")), TIMEOUT_MS)
+      ),
+    ]);
 
     if (result.status !== 200) {
       console.warn("[uploadNative] HTTP", result.status);
