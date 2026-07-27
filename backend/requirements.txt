@@ -8,3 +8,5 @@ uvicorn>=0.24.0,<1
 python-multipart>=0.0.6,<1
 Pillow>=10.0.0,<11
 matplotlib>=3.7.0,<4
+h5py>=3.8.0,<4
+gdown>=5.0.0,<6
