@@ -554,41 +554,48 @@ def is_likely_plant_leaf(image: np.ndarray) -> bool:
     """
     Multi-layer pre-check before model inference.
 
-    Layer 1 — Color: Potato leaves are predominantly green.
-      Diseased leaves may have large brown/decayed patches,
-      so we use soft thresholds here.
-    Layer 2 — Texture: Organic leaves have irregular, detailed textures
-      (veins, edges, spots). Synthetic surfaces (walls, plastic)
-      are uniform. Texture is the primary signal.
+    Layer 1 — Green Color: Potato leaves are predominantly green.
+      We check that green is the dominant channel and makes up a
+      significant portion of total intensity.
+    Layer 2 — Leaf Texture: We measure edge density and local gradient
+      patterns to distinguish organic leaf surfaces (veins, serrated
+      edges) from uniform synthetic surfaces.
     Layer 3 (downstream in is_unknown_image): Temperature-scaled confidence
       and entropy threshold to catch overconfident OOD predictions.
 
-    Returns True if the image could plausibly be a plant leaf
-    (passes color OR texture), False for clearly non-plant images.
+    Returns True only if BOTH green color AND leaf texture are present.
     """
-    # Compute shared features once
-    gray = np.mean(image.astype(np.float32), axis=2)
+    img_f = image.astype(np.float32)
+
+    # --- Layer 1: Green Color Check ---
+    total = np.sum(img_f, axis=2) + 1e-10
+    green_ratio = img_f[:, :, 1] / total
+    avg_green = float(np.mean(green_ratio))
+
+    green_dominant = float(np.mean(
+        (img_f[:, :, 1] > img_f[:, :, 0]) & (img_f[:, :, 1] > img_f[:, :, 2])
+    ))
+
+    green_excess = float(np.mean(img_f[:, :, 1] - np.maximum(img_f[:, :, 0], img_f[:, :, 2])))
+
+    passes_color = avg_green > 0.28 and green_dominant > 0.25 and green_excess > 5.0
+
+    # --- Layer 2: Leaf Texture Check ---
+    gray = np.mean(img_f, axis=2)
     gy, gx = np.gradient(gray)
     edge_mag = np.sqrt(gx**2 + gy**2)
-    intensity_std = float(np.std(gray))
+
+    edge_density = float(np.mean(edge_mag > 10.0))
     texture_complexity = float(np.std(edge_mag))
-    passes_texture = intensity_std > 1.5 and texture_complexity > 0.8
+    intensity_std = float(np.std(gray))
 
-    # Layer 1: Color (green ratio) — soft check
-    total = np.sum(image, axis=2, keepdims=True).astype(np.float32) + 1e-10
-    green_ratio = image[:, :, 1].astype(np.float32) / total[:, :, 0]
-    avg_green = float(np.mean(green_ratio))
-    green_dominant = float(np.mean(
-        (image[:, :, 1].astype(np.float32) > image[:, :, 0].astype(np.float32)) &
-        (image[:, :, 1].astype(np.float32) > image[:, :, 2].astype(np.float32))
-    ))
-    passes_color = avg_green > 0.20 and green_dominant > 0.10
+    passes_texture = (
+        edge_density > 0.05
+        and texture_complexity > 12.0
+        and intensity_std > 25.0
+    )
 
-    # Accept if either color or texture suggests a plant leaf.
-    # Diseased leaves may fail color (brown patches) but still have
-    # organic texture — let the model decide.
-    # Non-plant objects (walls, toys, animals) fail BOTH checks.
-    return passes_color or passes_texture
+    return passes_color and passes_texture
 
 
 def is_unknown_image(predictions, threshold=UNKNOWN_THRESHOLD, individual_preds=None):
