@@ -610,11 +610,13 @@ def is_unknown_image(predictions, threshold=UNKNOWN_THRESHOLD, individual_preds=
     is_low_conf = max_prob_cal < threshold
     is_high_entropy = norm_entropy > ENTROPY_THRESHOLD
 
-    # If at least 2 out of 3 models agree on the same class, override unknown
+    # Model agreement: if 2/3 models agree AND confidence is reasonable, override unknown.
+    # But don't override if raw confidence is very low (< 0.50) — that's truly uncertain.
     if individual_preds is not None and len(individual_preds) >= 2:
         majority_class = np.argmax(np.bincount([np.argmax(p) for p in individual_preds]))
         agreement = sum(1 for p in individual_preds if np.argmax(p) == majority_class)
-        if agreement >= 2:
+        raw_max = float(np.max(predictions))
+        if agreement >= 2 and raw_max > 0.50:
             is_low_conf = False
             is_high_entropy = False
 
