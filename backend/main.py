@@ -323,15 +323,6 @@ except Exception as exc:
     MODEL_LOAD_ERRORS["mobilenetv2"] = str(exc)
     logger.warning(f"Failed to load mobilenetv2: {exc}")
 
-# Warm up TF and cache Grad-CAM models after all models are loaded
-_startup_start = time.time()
-if MODELS:
-    _warm_up_models()
-    _build_grad_models()
-logger.info(f"Startup complete: {len(MODELS)} models loaded, "
-            f"{len(_grad_models)} Grad-CAM models cached "
-            f"({time.time() - _startup_start:.1f}s warm-up)")
-
 CLASS_NAMES = ["Early Blight", "Late Blight", "Healthy"]
 UNKNOWN_CLASS = "Unknown"
 UNKNOWN_THRESHOLD = 0.85    # Max confidence below this -> "Unknown Image"
@@ -441,6 +432,15 @@ def _find_layer_in_model(model, layer_name):
             if result is not None:
                 return result
     return None
+
+# Warm up TF and cache Grad-CAM models after all models are loaded
+_startup_start = time.time()
+if MODELS:
+    _warm_up_models()
+    _build_grad_models()
+logger.info(f"Startup complete: {len(MODELS)} models loaded, "
+            f"{len(_grad_models)} Grad-CAM models cached "
+            f"({time.time() - _startup_start:.1f}s warm-up)")
 
 
 def compute_gradcam(model, img_array, model_id):
