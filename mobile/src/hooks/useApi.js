@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { File, UploadType } from "expo-file-system";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "https://AswinPanta-potatodoc.hf.space";
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 export const MODEL_IDS = ["cnn-baseline", "transfer-learning", "mobilenetv2"];
 

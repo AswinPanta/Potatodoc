@@ -119,11 +119,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://AswinPanta-potatodoc.hf.space",  # HF Space (production)
-        "http://localhost:3000",                    # React dev server
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=["*"],
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept"],
 )
