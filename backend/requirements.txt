@@ -1,0 +1,10 @@
+# Dockerfile is the single source of truth for production dependencies.
+# This requirements.txt is for local development only — match versions here.
+# The Docker image uses tensorflow/tensorflow:2.15.0 (Python 3.11).
+
+numpy>=1.24
+fastapi>=0.100.0,<1
+uvicorn>=0.24.0,<1
+python-multipart>=0.0.6,<1
+Pillow>=10.0.0,<11
+matplotlib>=3.7.0,<4

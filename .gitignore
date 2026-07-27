@@ -1,6 +1,35 @@
-.vscode
-.pycharm
-__pycache__
-.idea
-.ipynb_checkpoints
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+api/venv/
+backend/venv/
+
+# Node
+node_modules/
+frontend/node_modules/
+mobile/node_modules/
+mobile/.expo/
+
+# IDE
+.vscode/
+.pycharm/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs & temp
+*.log
+api.pid
+test1.jpg
 models.config
+
+# Saved model artifacts (keep only essential files)
+saved_models/**/fingerprint.pb
+saved_models/**/*.weights.h5
+saved_models/**/model_old_placeholder.h5

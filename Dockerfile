@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir \
     && rm -rf /root/.cache/pip
 
 # Copy application code, model files, and frontend build
-COPY api/ ./api/
+COPY backend/ ./backend/
 COPY saved_models/ ./saved_models/
 COPY frontend/build/ ./frontend/build/
 
@@ -32,4 +32,4 @@ EXPOSE 8000
 # Use 2 workers for better throughput.
 # Note: each worker loads its own model copy (~33 MB total per worker).
 # The in-memory rate limiter is per-process (not shared across workers).
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
