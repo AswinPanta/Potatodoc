@@ -175,6 +175,14 @@ try:
         _download_thread.start()
     else:
         logger.info("All models found locally — skipping download")
+        from model_downloader import _update_status
+        _update_status(
+            state="complete",
+            overall_progress=100,
+            progress=100,
+            message="All models ready!",
+            models={k: "done" for k in verification},
+        )
 except ImportError:
     logger.warning("model_downloader not available — using local saved_models")
 except Exception as e:
