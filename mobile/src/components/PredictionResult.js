@@ -153,14 +153,14 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
           {hasEnsemble && heatmaps.heatmaps ? (
             <View style={styles.heatmapList}>
               {Object.entries(heatmaps.heatmaps).map(
-                ([modelName, overlayUrl]) => (
+                ([modelName, modelData]) => (
                   <View key={modelName} style={styles.heatmapItem}>
                     <Text style={styles.heatmapModelLabel}>
                       {modelName}
                     </Text>
-                    {overlayUrl ? (
+                    {modelData && modelData.overlay ? (
                       <Image
-                        source={{ uri: overlayUrl }}
+                        source={{ uri: modelData.overlay }}
                         style={styles.heatmapImage}
                         resizeMode="contain"
                       />
@@ -174,9 +174,9 @@ function HeatmapSection({ heatmaps, heatmapLoading, selectedModel, modelNames })
               )}
             </View>
           ) : (
-            heatmaps.heatmap && (
+            (heatmaps.overlay || heatmaps.heatmap) && (
               <Image
-                source={{ uri: heatmaps.heatmap }}
+                source={{ uri: heatmaps.overlay || heatmaps.heatmap }}
                 style={styles.heatmapImage}
                 resizeMode="contain"
               />
