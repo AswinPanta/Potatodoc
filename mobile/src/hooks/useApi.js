@@ -192,14 +192,22 @@ export function usePrediction() {
   const sendFile = async (selectedFile, selectedModel) => {
     if (!selectedFile || !selectedFile.uri) return null;
 
-    // ---- Diagnostic: test basic connectivity once (cache result) ----
+    // ---- Diagnostic: test basic connectivity (cache for 30s) ----
     if (!checkedOk.current) {
       const ok = await checkConnectivity();
       checkedOk.current = ok;
       if (!ok) {
-        console.error("[Prediction] Cannot reach API — /ping failed");
-        return null;
+        // Retry once after a short delay (server may still be starting)
+        await new Promise(r => setTimeout(r, 2000));
+        const retry = await checkConnectivity();
+        checkedOk.current = retry;
+        if (!retry) {
+          console.error("[Prediction] Cannot reach API — /ping failed");
+          return null;
+        }
       }
+      // Reset cache after 30s so transient failures don't permanently block
+      setTimeout(() => { checkedOk.current = false; }, 30000);
     }
 
     setIsloading(true);
