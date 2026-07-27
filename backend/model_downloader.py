@@ -44,24 +44,13 @@ GDRIVE_FILES = {
     },
 }
 
-# Expected directory structure after download:
-# saved_models/
-#   1/              <- CNN Baseline (extracted from zip)
-#   2/              <- Transfer Learning (extracted from zip)
-#     model.h5
-#     saved_model.pb
-#     ...
-#   3/
-#     model.h5      <- MobileNetV2 (direct .h5 file)
+# Marker file to avoid re-downloading on every startup
+_MARKER_FILE = ".models_downloaded"
 
 
 def _get_base_dir():
     """Get the project base directory."""
     return Path(__file__).resolve().parent.parent
-
-
-# Marker file to avoid re-downloading on every startup
-_MARKER_FILE = ".models_downloaded"
 
 
 def _is_downloaded(base_dir: Path) -> bool:
@@ -106,54 +95,52 @@ def _extract_zip(zip_path: Path, extract_dir: Path) -> bool:
 def download_models(base_dir: Path = None) -> dict:
     """
     Download all model files from Google Drive.
-    
+
     Returns a dict of {model_name: success_bool}.
     """
     if base_dir is None:
         base_dir = _get_base_dir()
-    
+
     models_dir = base_dir / "saved_models"
     cache_dir = base_dir / ".model_cache"
-    
+
     # Create directories
     models_dir.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    # Check marker file first — skip if already downloaded
+    if _is_downloaded(base_dir):
+        logger.info("Models already downloaded (marker file found) — skipping")
+        return {name: True for name in GDRIVE_FILES}
+
     results = {}
-    
+
     for model_name, config in GDRIVE_FILES.items():
         dest_path = base_dir / config["extract_to"]
-        
+
         # Check if model already exists locally
         if config["is_zip"]:
-            # For zips, check if the extract directory has files
             if dest_path.exists() and any(dest_path.iterdir()):
                 logger.info(f"Model '{model_name}' already exists at {dest_path}")
                 results[model_name] = True
                 continue
         else:
-            # For direct files (like .h5), check if file exists and is valid
             if dest_path.exists() and dest_path.stat().st_size > 1000:
                 logger.info(f"Model '{model_name}' already exists at {dest_path}")
                 results[model_name] = True
                 continue
-    
-    # If we get here, all models exist - mark as downloaded
-    if results and all(results.values()):
-        _mark_downloaded(base_dir)
-        
+
         logger.info(f"Downloading model '{model_name}' from Google Drive...")
         zip_path = cache_dir / config["filename"]
-        
+
         # Download
         if not _download_file(config["file_id"], zip_path):
             logger.error(f"Failed to download {config['filename']}")
             results[model_name] = False
             continue
-        
+
         # Extract if zip
         if config["is_zip"]:
-            # Create the target directory and extract into it
             dest_path.mkdir(parents=True, exist_ok=True)
             if _extract_zip(zip_path, dest_path):
                 logger.info(f"Model '{model_name}' extracted to {dest_path}")
@@ -161,63 +148,64 @@ def download_models(base_dir: Path = None) -> dict:
             else:
                 results[model_name] = False
         else:
-            # Direct file (e.g., .h5) - copy to destination
+            # Direct file (e.g., .h5) — copy to destination
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(zip_path, dest_path)
             logger.info(f"Model '{model_name}' copied to {dest_path}")
             results[model_name] = True
-    
+
+    # Mark as downloaded if all succeeded
+    if results and all(results.values()):
+        _mark_downloaded(base_dir)
+        logger.info("All models downloaded — created marker file")
+
     return results
 
 
 def verify_models(base_dir: Path = None) -> dict:
     """
     Verify that all required model files exist locally.
-    
+
     Returns a dict of {model_name: exists_bool}.
     """
     if base_dir is None:
         base_dir = _get_base_dir()
-    
+
     models_dir = base_dir / "saved_models"
-    
+
     checks = {
         "cnn-baseline": models_dir / "1" / "saved_model.pb",
         "transfer-learning": models_dir / "2" / "model.h5",
         "mobilenetv2": models_dir / "3" / "model.h5",
     }
-    
+
     results = {}
     for name, path in checks.items():
         exists = path.exists() and path.stat().st_size > 1000
         results[name] = exists
         if exists:
-            logger.info(f"✓ Model '{name}' found at {path}")
+            logger.info(f"Model '{name}' found at {path}")
         else:
-            logger.warning(f"✗ Model '{name}' NOT found at {path}")
-    
+            logger.warning(f"Model '{name}' NOT found at {path}")
+
     return results
 
-
-if __name__ == "__main__" and "__file__" in dir():
-    # Only run standalone if imported as module
-    pass
 
 if __name__ == "__main__":
     # Run as standalone script to download models
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    
+
     print("=== Downloading Models from Google Drive ===\n")
     results = download_models()
-    
+
     print("\n=== Verification ===\n")
     verification = verify_models()
-    
+
     print("\n=== Summary ===\n")
     for name, success in results.items():
-        status = "✓" if success else "✗"
-        print(f"  {status} {name}: {'Downloaded' if success else 'FAILED'}")
-    
+        status = "OK" if success else "FAILED"
+        print(f"  [{status}] {name}")
+
     for name, exists in verification.items():
-        status = "✓" if exists else "✗"
-        print(f"  {status} {name}: {'Found' if exists else 'MISSING'}")
+        status = "FOUND" if exists else "MISSING"
+        print(f"  [{status}] {name}")
