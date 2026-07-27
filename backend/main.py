@@ -821,10 +821,30 @@ async def gradcam(
 
 
 # ---------- Frontend Static Files ----------
-# Mount the production frontend build so the API serves both backend and frontend
+# Serve the production frontend build. API routes above take priority;
+# this catch-all only handles paths that don't match any API route.
 frontend_build = BASE_DIR.parent / "frontend" / "build"
 if frontend_build.exists() and (frontend_build / "index.html").exists():
-    app.mount("/", StaticFiles(directory=str(frontend_build), html=True), name="frontend")
+    from fastapi.responses import FileResponse
+
+    # Serve static assets (CSS, JS, images)
+    static_dir = frontend_build / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Catch-all: serve index.html for SPA client-side routing."""
+        # Try to serve the exact file first (favicon.ico, manifest.json, etc.)
+        file_path = frontend_build / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        # Fall back to index.html for SPA routing
+        index = frontend_build / "index.html"
+        if index.exists():
+            return FileResponse(str(index))
+        raise HTTPException(status_code=404)
+
     logger.info(f"Serving frontend from {frontend_build}")
 else:
     logger.info("No frontend build found at %s — API-only mode", frontend_build)
