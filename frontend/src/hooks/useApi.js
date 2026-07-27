@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const TIMEOUT_MS = 30000; // 30s timeout for slow model inference
 
 export function useModels() {
   const [models, setModels] = useState(["cnn-baseline", "transfer-learning", "mobilenetv2", "ensemble"]);
@@ -41,6 +42,7 @@ export function usePrediction() {
         method: "post",
         url: `${API_BASE}/predict?model_id=${selectedModel}`,
         data: formData,
+        timeout: TIMEOUT_MS,
       });
       if (res.status === 200) {
         setData(res.data);
@@ -65,12 +67,13 @@ export async function fetchGradcam(file, modelId) {
   if (!file) return null;
   let formData = new FormData();
   formData.append("file", file);
-  try {
-    let res = await axios({
-      method: "post",
-      url: `${API_BASE}/gradcam?model_id=${modelId}`,
-      data: formData,
-    });
+    try {
+      let res = await axios({
+        method: "post",
+        url: `${API_BASE}/gradcam?model_id=${modelId}`,
+        data: formData,
+        timeout: TIMEOUT_MS,
+      });
     if (res.status === 200 && !res.data.error) {
       return res.data;
     }
