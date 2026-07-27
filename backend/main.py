@@ -762,8 +762,10 @@ async def predict(
     else:
         if model_id not in MODELS:
             raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
-        processed = preprocess_for_model(img_batch, model_id)
-        predictions = MODELS[model_id].predict(processed, verbose=0)
+        result = await asyncio.get_event_loop().run_in_executor(
+            _executor, lambda: _predict_single_model(model_id, img_batch)
+        )
+        predictions = result[np.newaxis, :]
 
         unknown, max_conf, norm_entropy = is_unknown_image(predictions[0])
         if unknown:
