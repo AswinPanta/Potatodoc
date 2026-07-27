@@ -10,9 +10,7 @@ import CloudDownload from "@material-ui/icons/CloudDownload";
 
 const POLL_INTERVAL = 1500; // ms between status checks
 
-const STATUS_API = process.env.REACT_APP_API_URL
-  ? `${process.env.REACT_APP_API_URL}/setup/status`
-  : "http://localhost:8000/setup/status";
+const STATUS_API = "/setup/status";
 
 const MODEL_ORDER = ["cnn_baseline", "transfer_learning", "mobilenetv2"];
 
