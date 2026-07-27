@@ -324,9 +324,13 @@ except Exception as exc:
     logger.warning(f"Failed to load mobilenetv2: {exc}")
 
 # Warm up TF and cache Grad-CAM models after all models are loaded
+_startup_start = time.time()
 if MODELS:
     _warm_up_models()
     _build_grad_models()
+logger.info(f"Startup complete: {len(MODELS)} models loaded, "
+            f"{len(_grad_models)} Grad-CAM models cached "
+            f"({time.time() - _startup_start:.1f}s warm-up)")
 
 CLASS_NAMES = ["Early Blight", "Late Blight", "Healthy"]
 UNKNOWN_CLASS = "Unknown"
