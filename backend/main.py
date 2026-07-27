@@ -150,11 +150,12 @@ MODELS = {}
 MODEL_LOAD_ERRORS = {}
 
 # ---------- Download Models from Google Drive if needed ----------
+_download_thread = None
 try:
     try:
-        from backend.model_downloader import download_models, verify_models
+        from backend.model_downloader import download_models, verify_models, get_download_status
     except ImportError:
-        from model_downloader import download_models, verify_models
+        from model_downloader import download_models, verify_models, get_download_status
     project_base = BASE_DIR.parent
     
     # Check if models exist locally
@@ -162,15 +163,22 @@ try:
     verification = verify_models(project_base)
     
     if not all(verification.values()):
-        logger.info("Some models missing — downloading from Google Drive...")
-        download_results = download_models(project_base)
-        logger.info(f"Download results: {download_results}")
+        logger.info("Some models missing — starting background download from Google Drive...")
+        import threading
+        def _bg_download():
+            try:
+                download_results = download_models(project_base)
+                logger.info(f"Download results: {download_results}")
+            except Exception as e:
+                logger.error(f"Background download failed: {e}")
+        _download_thread = threading.Thread(target=_bg_download, daemon=True)
+        _download_thread.start()
     else:
         logger.info("All models found locally — skipping download")
 except ImportError:
     logger.warning("model_downloader not available — using local saved_models")
 except Exception as e:
-    logger.warning(f"Model download failed: {e} — will try local saved_models")
+    logger.warning(f"Model download setup failed: {e} — will try local saved_models")
 
 # Find saved_models directory (Docker path vs local dev path)
 model_base = BASE_DIR / "../saved_models"
@@ -562,6 +570,17 @@ def _run_ensemble(img_batch):
 
 
 # ---------- API Routes ----------
+
+@app.get("/setup/status")
+def setup_status():
+    """Return model download progress for the onboarding screen."""
+    try:
+        return get_download_status()
+    except NameError:
+        return {"state": "idle", "overall_progress": 0, "models": {}, "message": "Waiting..."}
+    except Exception as e:
+        return {"state": "error", "error": str(e), "overall_progress": 0}
+
 
 @app.get("/ping")
 def ping():
