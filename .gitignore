@@ -15,6 +15,13 @@ frontend/node_modules/
 frontend/build/
 mobile/node_modules/
 mobile/.expo/
+mobile/android/
+mobile/ios/
+
+# Environment files
+.env
+.env.local
+.env.*.local
 
 # IDE
 .vscode/
@@ -29,6 +36,9 @@ mobile/.expo/
 api.pid
 test1.jpg
 models.config
+
+# Coverage
+coverage/
 
 # Model cache
 .model_cache/
