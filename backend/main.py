@@ -467,11 +467,11 @@ def compute_gradcam(model, img_array, model_id):
 
 
 def array_to_base64(arr: np.ndarray) -> str:
-    """Convert a numpy image array (H, W, 3) to a base64 data URI."""
+    """Convert a numpy image array (H, W, 3) to a base64 JPEG data URI."""
     arr = np.clip(arr, 0, 255).astype(np.uint8)
     buf = io.BytesIO()
-    Image.fromarray(arr).save(buf, format="PNG")
-    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
+    Image.fromarray(arr).save(buf, format="JPEG", quality=85)
+    return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 
 def generate_heatmap_overlay(heatmap, original_image):
