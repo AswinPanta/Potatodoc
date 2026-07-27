@@ -2,9 +2,7 @@ import React, { useState, useEffect } from "react";
 import HomePage from "./pages/HomePage";
 import OnboardingScreen from "./components/OnboardingScreen";
 
-const STATUS_API = process.env.REACT_APP_API_URL
-  ? `${process.env.REACT_APP_API_URL}/setup/status`
-  : "http://localhost:8000/setup/status";
+const STATUS_API = "/setup/status";
 
 function App() {
   const [setupComplete, setSetupComplete] = useState(false);
