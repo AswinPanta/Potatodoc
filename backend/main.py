@@ -285,11 +285,12 @@ def _build_mobilenetv2_model():
 
 
 # --- Load CNN Baseline (SavedModel format, works directly) ---
+_t0 = time.time()
 try:
     cnn_path = model_base / "1"
     if cnn_path.exists():
         MODELS["cnn-baseline"] = tf.keras.models.load_model(str(cnn_path))
-        logger.info("Loaded model cnn-baseline")
+        logger.info(f"Loaded model cnn-baseline ({time.time() - _t0:.1f}s)")
     else:
         MODEL_LOAD_ERRORS["cnn-baseline"] = f"Path does not exist: {cnn_path}"
 except Exception as exc:
@@ -297,11 +298,12 @@ except Exception as exc:
     logger.warning(f"Failed to load cnn-baseline: {exc}")
 
 # --- Load Transfer Learning (rebuild from h5 weights) ---
+_t0 = time.time()
 try:
     tl_path = model_base / "2"
     if tl_path.exists():
         MODELS["transfer-learning"] = _build_transfer_learning_model()
-        logger.info("Loaded model transfer-learning (rebuilt from h5)")
+        logger.info(f"Loaded model transfer-learning ({time.time() - _t0:.1f}s)")
     else:
         MODEL_LOAD_ERRORS["transfer-learning"] = f"Path does not exist: {tl_path}"
 except Exception as exc:
@@ -309,11 +311,12 @@ except Exception as exc:
     logger.warning(f"Failed to load transfer-learning: {exc}")
 
 # --- Load MobileNetV2 (rebuild from SavedModel variables) ---
+_t0 = time.time()
 try:
     mv_path = model_base / "3"
     if mv_path.exists():
         MODELS["mobilenetv2"] = _build_mobilenetv2_model()
-        logger.info("Loaded model mobilenetv2 (rebuilt from SavedModel vars)")
+        logger.info(f"Loaded model mobilenetv2 ({time.time() - _t0:.1f}s)")
     else:
         MODEL_LOAD_ERRORS["mobilenetv2"] = f"Path does not exist: {mv_path}"
 except Exception as exc:
