@@ -370,7 +370,7 @@ def _warm_up_models():
             logger.warning(f"Warm-up failed for {mid}: {exc}")
 
 def read_file_as_image(data) -> np.ndarray:
-    image = Image.open(io.BytesIO(data)).convert("RGB").resize((256, 256))
+    image = Image.open(io.BytesIO(data)).convert("RGB").resize((256, 256), Image.BILINEAR)
     return np.array(image)
 
 def preprocess_for_model(image: np.ndarray, model_id: str) -> np.ndarray:
