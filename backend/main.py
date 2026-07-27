@@ -8,6 +8,12 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 import tensorflow as tf
+
+# Limit TF thread pools to avoid CPU over-subscription with multiple workers.
+# With 2 uvicorn workers and 4 CPU cores, each worker should use ~2 threads.
+tf.config.threading.set_intra_op_parallelism_threads(2)
+tf.config.threading.set_inter_op_parallelism_threads(2)
+
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 import matplotlib
 matplotlib.use('Agg')
