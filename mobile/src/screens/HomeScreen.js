@@ -117,6 +117,7 @@ export default function HomeScreen() {
     setImageUri(null);
     setHeatmaps(null);
     setSaved(false);
+    setProcessing(false);
   };
 
   const handleSaveToHistory = () => {
