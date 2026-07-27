@@ -30,7 +30,11 @@ api.pid
 test1.jpg
 models.config
 
-# Saved model artifacts (keep only essential files)
-saved_models/**/fingerprint.pb
-saved_models/**/*.weights.h5
-saved_models/**/model_old_placeholder.h5
+# Model cache
+.model_cache/
+
+# Saved models (downloaded from Google Drive on startup)
+saved_models/
+
+# Keep .gitattributes
+!.gitattributes

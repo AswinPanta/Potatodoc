@@ -149,6 +149,26 @@ BASE_DIR = Path(__file__).resolve().parent
 MODELS = {}
 MODEL_LOAD_ERRORS = {}
 
+# ---------- Download Models from Google Drive if needed ----------
+try:
+    from backend.model_downloader import download_models, verify_models
+    project_base = BASE_DIR.parent
+    
+    # Check if models exist locally
+    models_dir = project_base / "saved_models"
+    verification = verify_models(project_base)
+    
+    if not all(verification.values()):
+        logger.info("Some models missing — downloading from Google Drive...")
+        download_results = download_models(project_base)
+        logger.info(f"Download results: {download_results}")
+    else:
+        logger.info("All models found locally — skipping download")
+except ImportError:
+    logger.warning("model_downloader not available — using local saved_models")
+except Exception as e:
+    logger.warning(f"Model download failed: {e} — will try local saved_models")
+
 # Find saved_models directory (Docker path vs local dev path)
 model_base = BASE_DIR / "../saved_models"
 if not model_base.exists():

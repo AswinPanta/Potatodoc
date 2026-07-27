@@ -13,12 +13,17 @@ RUN pip install --no-cache-dir \
     "python-multipart>=0.0.6,<1" \
     "Pillow>=10.0.0,<11" \
     "matplotlib>=3.7.0,<4" \
+    "gdown>=5.0.0" \
     && rm -rf /root/.cache/pip
 
-# Copy application code, model files, and frontend build
+# Copy application code and frontend build
 COPY backend/ ./backend/
-COPY saved_models/ ./saved_models/
 COPY frontend/build/ ./frontend/build/
+
+# Models are downloaded from Google Drive on first startup
+# (backend/model_downloader.py handles this automatically)
+# Local saved_models/ directory is used as cache
+RUN mkdir -p saved_models
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
