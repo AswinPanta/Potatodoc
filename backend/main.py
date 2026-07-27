@@ -476,13 +476,15 @@ def array_to_base64(arr: np.ndarray) -> str:
 
 def generate_heatmap_overlay(heatmap, original_image):
     """
-    Generate two base64-encoded PNGs:
+    Generate two base64-encoded JPEGs:
       - 'overlay':  heatmap blended over the original image
       - 'raw':      heatmap alone (jet colormap, no background)
     """
-    heatmap_resized = tf.image.resize(
-        heatmap[..., np.newaxis], (256, 256)
-    ).numpy().squeeze()
+    heatmap_resized = np.array(
+        Image.fromarray((np.clip(heatmap, 0, 1) * 255).astype(np.uint8)).resize(
+            (256, 256), Image.BILINEAR
+        )
+    ).astype(np.float32) / 255.0
     heatmap_norm = np.clip(heatmap_resized, 0, 1)
     heatmap_gamma = np.power(heatmap_norm, 0.7)
 
