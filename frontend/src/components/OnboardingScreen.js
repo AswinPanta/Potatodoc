@@ -122,7 +122,6 @@ export default function OnboardingScreen({ onComplete }) {
               variant="determinate"
               value={overall}
               style={styles.progressBar}
-              classes={{ bar: styles.progressFill }}
             />
           </div>
         )}
