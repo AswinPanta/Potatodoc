@@ -108,6 +108,10 @@ export default function HomePage() {
   };
 
   const nextImage = () => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop());
+      setWebcamStream(null);
+    }
     setData(null);
     setImage(false);
     setSelectedFile(null);
