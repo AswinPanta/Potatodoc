@@ -515,21 +515,25 @@ def generate_heatmap_overlay(heatmap, original_image):
     }
 
 
+def _compute_single_heatmap(mid, image):
+    """Compute Grad-CAM heatmap for a single model (used by thread pool)."""
+    processed = preprocess_for_model(np.expand_dims(image, 0), mid)
+    heatmap_raw = compute_gradcam(MODELS[mid], processed, mid)
+    result = generate_heatmap_overlay(heatmap_raw, image)
+    return mid, {
+        'overlay': result['overlay'],
+        'raw': result['raw'],
+    }
+
+
 def get_all_heatmaps(image):
-    """Compute Grad-CAM heatmaps for all models."""
+    """Compute Grad-CAM heatmaps for all models in parallel."""
     heatmaps = {}
-    for mid in MODELS.keys():
-        try:
-            processed = preprocess_for_model(np.expand_dims(image, 0), mid)
-            heatmap_raw = compute_gradcam(MODELS[mid], processed, mid)
-            result = generate_heatmap_overlay(heatmap_raw, image)
-            heatmaps[MODEL_NAMES[mid]] = {
-                'overlay': result['overlay'],
-                'raw': result['raw'],
-            }
-        except Exception as exc:
-            logger.warning(f"Grad-CAM failed for {mid}: {exc}")
-            heatmaps[MODEL_NAMES[mid]] = None
+    results = list(_executor.map(
+        lambda mid: _compute_single_heatmap(mid, image), MODELS.keys()
+    ))
+    for mid, result in results:
+        heatmaps[MODEL_NAMES[mid]] = result
     return heatmaps
 
 
