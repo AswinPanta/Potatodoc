@@ -60,6 +60,22 @@ def _get_base_dir():
     return Path(__file__).resolve().parent.parent
 
 
+# Marker file to avoid re-downloading on every startup
+_MARKER_FILE = ".models_downloaded"
+
+
+def _is_downloaded(base_dir: Path) -> bool:
+    """Check if models have already been downloaded."""
+    marker = base_dir / _MARKER_FILE
+    return marker.exists()
+
+
+def _mark_downloaded(base_dir: Path):
+    """Create marker file after successful download."""
+    marker = base_dir / _MARKER_FILE
+    marker.write_text("Models downloaded from Google Drive")
+
+
 def _download_file(file_id: str, destination: Path) -> bool:
     """Download a file from Google Drive using gdown."""
     try:
@@ -116,11 +132,15 @@ def download_models(base_dir: Path = None) -> dict:
                 results[model_name] = True
                 continue
         else:
-            # For direct files (like .h5), check if file exists
+            # For direct files (like .h5), check if file exists and is valid
             if dest_path.exists() and dest_path.stat().st_size > 1000:
                 logger.info(f"Model '{model_name}' already exists at {dest_path}")
                 results[model_name] = True
                 continue
+    
+    # If we get here, all models exist - mark as downloaded
+    if results and all(results.values()):
+        _mark_downloaded(base_dir)
         
         logger.info(f"Downloading model '{model_name}' from Google Drive...")
         zip_path = cache_dir / config["filename"]
@@ -133,8 +153,10 @@ def download_models(base_dir: Path = None) -> dict:
         
         # Extract if zip
         if config["is_zip"]:
-            if _extract_zip(zip_path, dest_path.parent):
-                logger.info(f"Model '{model_name}' extracted to {dest_path.parent}")
+            # Create the target directory and extract into it
+            dest_path.mkdir(parents=True, exist_ok=True)
+            if _extract_zip(zip_path, dest_path):
+                logger.info(f"Model '{model_name}' extracted to {dest_path}")
                 results[model_name] = True
             else:
                 results[model_name] = False
@@ -176,6 +198,10 @@ def verify_models(base_dir: Path = None) -> dict:
     
     return results
 
+
+if __name__ == "__main__" and "__file__" in dir():
+    # Only run standalone if imported as module
+    pass
 
 if __name__ == "__main__":
     # Run as standalone script to download models

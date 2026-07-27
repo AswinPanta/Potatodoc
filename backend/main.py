@@ -151,7 +151,10 @@ MODEL_LOAD_ERRORS = {}
 
 # ---------- Download Models from Google Drive if needed ----------
 try:
-    from backend.model_downloader import download_models, verify_models
+    try:
+        from backend.model_downloader import download_models, verify_models
+    except ImportError:
+        from model_downloader import download_models, verify_models
     project_base = BASE_DIR.parent
     
     # Check if models exist locally
