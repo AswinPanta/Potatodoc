@@ -320,11 +320,54 @@ except Exception as exc:
     MODEL_LOAD_ERRORS["mobilenetv2"] = str(exc)
     logger.warning(f"Failed to load mobilenetv2: {exc}")
 
+# Warm up TF and cache Grad-CAM models after all models are loaded
+if MODELS:
+    _warm_up_models()
+    _build_grad_models()
+
 CLASS_NAMES = ["Early Blight", "Late Blight", "Healthy"]
 UNKNOWN_CLASS = "Unknown"
 UNKNOWN_THRESHOLD = 0.85    # Max confidence below this -> "Unknown Image"
 ENTROPY_THRESHOLD = 0.80     # Norm. entropy above this -> "Unknown Image"
 TEMPERATURE_SCALE = 1.5      # Softmax temperature for OOD calibration
+
+# ---------- Grad-CAM Sub-Model Cache ----------
+# Built once at startup to avoid rebuilding tf.keras.Model on every request.
+_grad_models = {}
+
+
+def _build_grad_models():
+    """Pre-build Grad-CAM sub-models for each loaded model."""
+    for mid, model in MODELS.items():
+        try:
+            last_conv_name, _ = find_last_conv_layer(model, mid)
+            if last_conv_name is None:
+                logger.warning(f"No Conv2D layer found for {mid} — Grad-CAM disabled")
+                continue
+            actual_layer = _find_layer_in_model(model, last_conv_name)
+            if actual_layer is None:
+                logger.warning(f"Layer '{last_conv_name}' not found in {mid} — Grad-CAM disabled")
+                continue
+            grad_model = tf.keras.models.Model(
+                inputs=model.input,
+                outputs=[actual_layer.output, model.output]
+            )
+            _grad_models[mid] = grad_model
+            logger.info(f"Cached Grad-CAM model for {mid}")
+        except Exception as exc:
+            logger.warning(f"Failed to build Grad-CAM model for {mid}: {exc}")
+
+
+def _warm_up_models():
+    """Run dummy inferences to warm up TF graph execution."""
+    dummy = np.zeros((1, IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.float32)
+    for mid, model in MODELS.items():
+        try:
+            processed = preprocess_for_model(dummy, mid)
+            _ = model(processed, training=False)
+            logger.info(f"Warm-up passed for {mid}")
+        except Exception as exc:
+            logger.warning(f"Warm-up failed for {mid}: {exc}")
 
 def read_file_as_image(data) -> np.ndarray:
     image = Image.open(io.BytesIO(data)).convert("RGB").resize((256, 256))
