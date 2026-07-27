@@ -437,20 +437,22 @@ def _find_layer_in_model(model, layer_name):
 
 
 def compute_gradcam(model, img_array, model_id):
-    last_conv_name, containing_layer = find_last_conv_layer(model, model_id)
-    if last_conv_name is None:
-        raise ValueError(f"Could not find a Conv2D layer in model '{model_id}'")
-
-    actual_layer = _find_layer_in_model(model, last_conv_name)
-    if actual_layer is None:
-        raise ValueError(f"Layer '{last_conv_name}' not found in model graph")
-
     img_tensor = tf.cast(img_array, tf.float32)
 
-    grad_model = tf.keras.models.Model(
-        inputs=model.input,
-        outputs=[actual_layer.output, model.output]
-    )
+    if model_id in _grad_models:
+        grad_model = _grad_models[model_id]
+    else:
+        last_conv_name, _ = find_last_conv_layer(model, model_id)
+        if last_conv_name is None:
+            raise ValueError(f"Could not find a Conv2D layer in model '{model_id}'")
+        actual_layer = _find_layer_in_model(model, last_conv_name)
+        if actual_layer is None:
+            raise ValueError(f"Layer '{last_conv_name}' not found in model graph")
+        grad_model = tf.keras.models.Model(
+            inputs=model.input,
+            outputs=[actual_layer.output, model.output]
+        )
+
     with tf.GradientTape() as tape:
         tape.watch(img_tensor)
         conv_outputs, predictions = grad_model(img_tensor)
