@@ -112,7 +112,7 @@ def _download_file(file_id: str, destination: Path, model_name: str) -> bool:
             _update_status(progress=pct)
 
         url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, str(destination), quiet=True, fuzzy=True,
+        gdown.download(url, str(destination), quiet=True,
                        callback=_progress_hook)
         return destination.exists()
     except ImportError:
