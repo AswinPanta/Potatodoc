@@ -803,7 +803,9 @@ async def gradcam(
             if model_id not in MODELS:
                 raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
             processed = preprocess_for_model(np.expand_dims(image, 0), model_id)
-            heatmap_array = compute_gradcam(MODELS[model_id], processed, model_id)
+            heatmap_array = await asyncio.get_event_loop().run_in_executor(
+                _executor, lambda: compute_gradcam(MODELS[model_id], processed, model_id)
+            )
             result = generate_heatmap_overlay(heatmap_array, image)
             return {
                 "model_id": model_id,
