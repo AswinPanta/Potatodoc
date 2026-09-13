@@ -1,0 +1,1515 @@
+"""Build potato_doc_production_v2_fixed.ipynb"""
+import json
+from pathlib import Path
+
+cells = []
+
+def md(source):
+    cells.append({"cell_type": "markdown", "metadata": {}, "source": source.split("\n")})
+
+def code(source):
+    cells.append({"cell_type": "code", "metadata": {}, "source": source.split("\n"),
+                   "execution_count": None, "outputs": []})
+
+# ============================================================
+# CELL 0 — Title
+# ============================================================
+md(r"""# PotatoDoc: Production Validation Pipeline (v2 - Fixed)
+
+**All production-critical corrections applied.**
+
+| Fix | What changed |
+|-----|-------------|
+| PLD_MAP typo | `Phytophora` → `Phytopthora` (matches actual folder) |
+| Near-duplicate split | Global pHash, union-find groups kept in one split |
+| Robustness | Reloads checkpoint explicitly (no stale model) |
+| Bootstrap CI | Paired resampling (same indices for y_true, y_pred) |
+| Calibration | Threshold + temperature fitted on validation only |
+| OOD | Genuine images required; synthetic noise rejected |
+| Production save | CPU-safe state_dict |
+| Production gate | Fails closed when evidence is missing |
+| TTA | Retained (optional) |
+| Ensemble | Retained (optional, off by default) |
+
+> A GREEN result means engineering gates passed. It is not a guarantee of field safety.""")
+
+# ============================================================
+# CELL 1 — Setup
+# ============================================================
+code(r"""# ============================================================
+# CELL 1: Setup & Installation
+# ============================================================
+import subprocess, sys
+
+def install(pkg):
+    try:
+        __import__(pkg)
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", pkg])
+
+for p in ["timm", "albumentations", "imagehash", "scikit-learn", "pandas",
+          "matplotlib", "seaborn", "opencv-python-headless", "scipy"]:
+    install(p)
+
+print("All dependencies installed.")""")
+
+# ============================================================
+# CELL 2 — Imports & Config
+# ============================================================
+code(r"""# ============================================================
+# CELL 2: Imports & Configuration
+# ============================================================
+import os, json, time, random, hashlib, io, warnings
+from pathlib import Path
+from collections import Counter
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from PIL import Image
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    classification_report, f1_score, confusion_matrix,
+    balanced_accuracy_score
+)
+from sklearn.utils.class_weight import compute_class_weight
+
+import timm
+from timm.data import Mixup
+from timm.loss import SoftTargetCrossEntropy
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+SEED = 42
+DATA_DIR = Path("/content/dataset")
+RESULTS_DIR = Path("/content/results")
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+IPD_CLASSES = ["earlyblt", "healthy", "lateblt"]
+IPD_CLASS_NAMES = ["Early Blight", "Healthy", "Late Blight"]
+NUM_CLASSES = 3
+
+# FIXED: matches actual folder name "Phytopthora" (with the 't')
+PLD_MAP = {
+    "Fungi": 0,
+    "Healthy": 1,
+    "Phytopthora": 2,
+}
+PLD_CLEAN_SUBSET = {"Healthy", "Phytopthora"}
+
+# Set to True ONLY after confirming PLD disease semantics match these labels
+PLD_MAPPING_VERIFIED = False
+
+# Genuine OOD images only - no synthetic random noise
+OOD_DIRS = [DATA_DIR / "OOD", DATA_DIR / "ood"]
+OOD_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+MODELS_CONFIG = [
+    {"name": "efficientnetv2_b3", "timm_name": "tf_efficientnetv2_b3", "img_size": 300, "batch_size": 32},
+    {"name": "convnext_tiny_v1", "timm_name": "convnext_tiny.fb_in22k", "img_size": 224, "batch_size": 64},
+    {"name": "convnext_tiny_v2", "timm_name": "convnext_tiny.fb_in22k", "img_size": 224, "batch_size": 64},
+    {"name": "swin_tiny", "timm_name": "swin_tiny_patch4_window7_224.ms_in22k", "img_size": 224, "batch_size": 64},
+]
+
+TTA_ENABLED = True
+ENSEMBLE_ENABLED = False
+
+def set_seed(seed):
+    random.seed(seed); np.random.seed(seed)
+    torch.manual_seed(seed); torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+set_seed(SEED)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {device}")
+if torch.cuda.is_available():
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
+print(f"PyTorch {torch.__version__} | timm {timm.__version__}")""")
+
+# ============================================================
+# CELL 3 — Mount Drive
+# ============================================================
+code(r"""# ============================================================
+# CELL 3: Mount Drive & Locate Data
+# ============================================================
+try:
+    from google.colab import drive
+    drive.mount('/content/drive')
+    DATA_DIR = Path("/content/drive/MyDrive/dataset")
+    print(f"Mounted Drive. DATA_DIR = {DATA_DIR}")
+except ImportError:
+    DATA_DIR = Path(r"C:\Users\shadb\Downloads\dataset")
+    print(f"Local mode. DATA_DIR = {DATA_DIR}")
+
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+ipd_ok = all((DATA_DIR / c / c).exists() for c in IPD_CLASSES)
+print(f"IPD structure OK: {ipd_ok}")
+for c in IPD_CLASSES:
+    n = len(list((DATA_DIR / c / c).glob("*.*")))
+    print(f"  {c}/{c}/ : {n} images")
+
+pld_root = DATA_DIR / "PLD" / "Potato Leaf Disease Dataset in Uncontrolled Environment"
+print(f"\nPLD exists: {pld_root.exists()}")
+if pld_root.exists():
+    for d in sorted(pld_root.iterdir()):
+        if d.is_dir():
+            n = len(list(d.glob("*.*")))
+            mapped = PLD_MAP.get(d.name, "IGNORED")
+            print(f"  {d.name}: {n} images -> {mapped}")""")
+
+# ============================================================
+# CELL 4 — Dataset Audit
+# ============================================================
+md("""---\n## Phase 1: Dataset Audit""")
+
+code(r"""# ============================================================
+# CELL 4: Dataset Audit
+# ============================================================
+def scan_ipd():
+    records = []
+    for cls_idx, cls_name in enumerate(IPD_CLASSES):
+        cls_dir = DATA_DIR / cls_name / cls_name
+        for f in sorted(cls_dir.iterdir()):
+            if f.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                records.append({"path": str(f), "class": cls_name, "class_idx": cls_idx})
+    return pd.DataFrame(records)
+
+print("Scanning IPD...")
+t0 = time.time()
+df_ipd = scan_ipd()
+print(f"  Scanned {len(df_ipd)} images in {time.time()-t0:.1f}s")
+
+print("\n=== IPD Class Distribution ===")
+dist = df_ipd["class"].value_counts()
+for cls, cnt in dist.items():
+    print(f"  {cls:15s}: {cnt:6d} ({cnt/len(df_ipd)*100:.1f}%)")
+print(f"  Imbalance ratio: {dist.max()/dist.min():.2f}:1")
+
+print("\n=== Corruption Check ===")
+corrupt = []
+t0 = time.time()
+for _, row in df_ipd.iterrows():
+    try:
+        with Image.open(row["path"]) as img:
+            img.verify()
+    except Exception as e:
+        corrupt.append({"path": row["path"], "error": str(e)})
+print(f"  Checked {len(df_ipd)} images in {time.time()-t0:.1f}s")
+print(f"  Corrupted: {len(corrupt)}")
+if corrupt:
+    for c in corrupt[:5]:
+        print(f"    {c['path']}: {c['error']}")
+df_ipd["corrupted"] = df_ipd["path"].isin([c["path"] for c in corrupt])""")
+
+# ============================================================
+# CELL 5 — SHA256
+# ============================================================
+code(r"""# ============================================================
+# CELL 5: SHA256 Exact Duplicate Detection
+# ============================================================
+print("Computing SHA256 hashes...")
+t0 = time.time()
+hashes = []
+for p in df_ipd["path"]:
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    hashes.append(h.hexdigest())
+df_ipd["sha256"] = hashes
+print(f"  Hashed {len(df_ipd)} images in {time.time()-t0:.1f}s")
+
+dup_groups = df_ipd.groupby("sha256").filter(lambda x: len(x) > 1)
+n_dup = dup_groups["sha256"].nunique() if len(dup_groups) > 0 else 0
+print(f"\n=== Exact Duplicates ===")
+print(f"  Duplicate groups: {n_dup}")
+print(f"  Total duplicate images: {len(dup_groups)}")
+if n_dup > 0:
+    for h, grp in list(dup_groups.groupby("sha256"))[:5]:
+        print(f"    Hash {h[:16]}...: {len(grp)} copies")
+        for _, r in grp.head(2).iterrows():
+            print(f"      {r['path']}")
+
+cross = 0
+for h, grp in dup_groups.groupby("sha256"):
+    if grp["class"].nunique() > 1:
+        cross += 1
+        print(f"  CROSS-CLASS DUP: {grp['class'].tolist()}")
+print(f"Cross-class exact duplicates: {cross}")""")
+
+# ============================================================
+# CELL 6 — Global pHash + Union-Find
+# ============================================================
+code(r"""# ============================================================
+# CELL 6: Global Perceptual Hash Near-Duplicate Detection
+# ============================================================
+import imagehash
+
+print("Computing perceptual hashes (pHash)...")
+t0 = time.time()
+phashes = []
+for p in df_ipd["path"]:
+    try:
+        with Image.open(p) as img:
+            phashes.append(str(imagehash.phash(img.convert("RGB"))))
+    except Exception:
+        phashes.append(None)
+df_ipd["phash"] = phashes
+print(f"Done in {time.time()-t0:.1f}s")
+
+from imagehash import hex_to_hash
+valid = df_ipd[df_ipd["phash"].notna()].reset_index(drop=True)
+phash_objs = [hex_to_hash(h) for h in valid["phash"]]
+
+NEAR_DUP_HAMMING = 5
+near_dups = []
+n = len(valid)
+print(f"Checking {n} images globally for pHash distance <= {NEAR_DUP_HAMMING}...")
+
+for i in range(n):
+    hi = phash_objs[i]
+    for j in range(i + 1, n):
+        dist = hi - phash_objs[j]
+        if dist <= NEAR_DUP_HAMMING:
+            near_dups.append({
+                "path_a": valid.iloc[i]["path"],
+                "path_b": valid.iloc[j]["path"],
+                "class_a": valid.iloc[i]["class"],
+                "class_b": valid.iloc[j]["class"],
+                "distance": int(dist),
+            })
+
+near_df = pd.DataFrame(near_dups)
+print(f"Near-duplicate pairs: {len(near_df)}")
+if len(near_df):
+    print(f"Cross-class near-duplicates: {(near_df['class_a'] != near_df['class_b']).sum()}")
+    near_df.to_csv(RESULTS_DIR / "ipd_near_duplicates.csv", index=False)
+
+# Union-Find: group near-duplicates so they stay in one split
+parent = {}
+def find(x):
+    parent.setdefault(x, x)
+    if parent[x] != x:
+        parent[x] = find(parent[x])
+    return parent[x]
+def union(a, b):
+    ra, rb = find(a), find(b)
+    if ra != rb:
+        parent[rb] = ra
+
+for _, r in near_df.iterrows():
+    union(r["path_a"], r["path_b"])
+
+for p in df_ipd["path"]:
+    find(p)
+
+df_ipd["near_group"] = df_ipd["path"].map(lambda x: find(x))
+group_sizes = df_ipd["near_group"].value_counts()
+print(f"Near-duplicate connected groups: {(group_sizes > 1).sum()}")""")
+
+# ============================================================
+# CELL 7 — Group-Aware Leakage-Safe Split
+# ============================================================
+code(r"""# ============================================================
+# CELL 7: Leakage-Safe Group-Aware Split
+# ============================================================
+df_split = df_ipd[~df_ipd["corrupted"]].copy()
+
+group_rows = []
+for gid, g in df_split.groupby("near_group"):
+    counts = g["class_idx"].value_counts()
+    dominant = int(counts.index[0])
+    group_rows.append({
+        "group": gid,
+        "label": dominant,
+        "n": len(g),
+        "mixed_label": g["class_idx"].nunique() > 1,
+    })
+groups_df = pd.DataFrame(group_rows)
+
+mixed = groups_df[groups_df["mixed_label"]]
+if len(mixed):
+    print(f"WARNING: {len(mixed)} near-duplicate groups contain multiple labels.")
+    mixed.to_csv(RESULTS_DIR / "mixed_label_duplicate_groups.csv", index=False)
+
+g_train, g_temp = train_test_split(
+    groups_df["group"].tolist(), test_size=0.30,
+    random_state=SEED, stratify=groups_df["label"].tolist())
+gtemp_labels = groups_df.set_index("group").loc[g_temp, "label"].tolist()
+g_val, g_test = train_test_split(
+    g_temp, test_size=0.50, random_state=SEED, stratify=gtemp_labels)
+
+split_map = {}
+for g in g_train: split_map[g] = "train"
+for g in g_val: split_map[g] = "val"
+for g in g_test: split_map[g] = "test"
+
+df_split["split"] = df_split["near_group"].map(split_map)
+
+X_train = df_split.loc[df_split["split"]=="train", "path"].tolist()
+y_train = df_split.loc[df_split["split"]=="train", "class_idx"].tolist()
+X_val = df_split.loc[df_split["split"]=="val", "path"].tolist()
+y_val = df_split.loc[df_split["split"]=="val", "class_idx"].tolist()
+X_test = df_split.loc[df_split["split"]=="test", "path"].tolist()
+y_test = df_split.loc[df_split["split"]=="test", "class_idx"].tolist()
+
+sets = [set(X_train), set(X_val), set(X_test)]
+assert not (sets[0] & sets[1] or sets[0] & sets[2] or sets[1] & sets[2])
+
+for a, b in [("train","val"),("train","test"),("val","test")]:
+    ga = set(df_split.loc[df_split["split"]==a, "near_group"])
+    gb = set(df_split.loc[df_split["split"]==b, "near_group"])
+    assert not (ga & gb), f"LEAKAGE: near_group overlap between {a} and {b}"
+
+print(f"Train: {len(X_train)} | Val: {len(X_val)} | Test: {len(X_test)}")
+for name, y in [("Train", y_train), ("Val", y_val), ("Test", y_test)]:
+    counts = Counter(y)
+    print(f"\n{name} ({len(y)}):")
+    for i, c in enumerate(IPD_CLASS_NAMES):
+        print(f"  {c:15s}: {counts.get(i,0):6d} ({counts.get(i,0)/len(y)*100:.1f}%)")
+
+json.dump({"X_train": X_train, "y_train": y_train, "X_val": X_val, "y_val": y_val,
+           "X_test": X_test, "y_test": y_test}, open(RESULTS_DIR / "split_cache.json", "w"))
+df_split.to_csv(RESULTS_DIR / "ipd_split_manifest.csv", index=False)
+print("\nLeakage-safe split saved.")""")
+
+# ============================================================
+# CELL 8 — Load PLD
+# ============================================================
+code(r"""# ============================================================
+# CELL 8: Load PLD External Dataset
+# ============================================================
+def collect_pld():
+    root = DATA_DIR / "PLD" / "Potato Leaf Disease Dataset in Uncontrolled Environment"
+    paths, labels, groups = [], [], []
+    if not root.exists():
+        print(f"PLD root not found: {root}")
+        return paths, np.array([], dtype=int), groups
+    for folder, lab in PLD_MAP.items():
+        d = root / folder
+        if not d.exists():
+            print(f"WARNING: {d} not found")
+            continue
+        fs = sorted(str(p) for p in d.iterdir() if p.suffix.lower() in OOD_EXTS)
+        paths += fs; labels += [lab] * len(fs); groups += [folder] * len(fs)
+        print(f"  {folder} -> {IPD_CLASS_NAMES[lab]}: {len(fs)} images")
+    return paths, np.array(labels), groups
+
+print("=== PLD Dataset ===")
+pld_paths, pld_labels, pld_groups = collect_pld()
+
+if len(pld_paths) == 0:
+    print("WARNING: No PLD images found. Cross-domain evaluation will be skipped.")
+else:
+    print(f"Total PLD mapped: {len(pld_paths)}")
+
+print("\nPLD LABEL MAPPING (verify against dataset documentation):")
+for folder, idx in PLD_MAP.items():
+    print(f"  {folder!r} -> {IPD_CLASS_NAMES[idx]}")
+if not PLD_MAPPING_VERIFIED:
+    print("WARNING: PLD mapping UNVERIFIED. External results cannot be used as production evidence.")
+
+clean_mask = np.array([g in PLD_CLEAN_SUBSET for g in pld_groups]) if len(pld_groups) > 0 else np.array([], dtype=bool)
+print(f"Clean subset: {clean_mask.sum()} images")""")
+
+# ============================================================
+# CELL 8b — Data Quality Gate
+# ============================================================
+md("""---\n## Phase 1b: Data Quality Gate""")
+
+code(r"""# ============================================================
+# CELL 8b: Data Quality Gate
+# ============================================================
+print("=" * 70)
+print("DATA QUALITY GATE")
+print("=" * 70)
+
+exact_dup_count = int(df_ipd["sha256"].duplicated(keep=False).sum())
+corrupt_count = int(df_ipd["corrupted"].sum())
+near_pair_count = len(near_df) if "near_df" in dir() else 0
+
+print(f"Corrupted IPD images: {corrupt_count}")
+print(f"Exact-duplicate IPD images: {exact_dup_count}")
+print(f"Near-duplicate pairs: {near_pair_count}")
+print(f"PLD mapping verified: {PLD_MAPPING_VERIFIED}")
+print(f"PLD images found: {len(pld_paths)}")
+
+if corrupt_count:
+    print("NOTE: Corrupt images excluded from split.")
+if not PLD_MAPPING_VERIFIED:
+    print("BLOCKER: PLD mapping unverified. External PLD results are UNVERIFIED.")
+
+json.dump({
+    "corrupt_images": corrupt_count,
+    "exact_duplicate_images": exact_dup_count,
+    "near_duplicate_pairs": near_pair_count,
+    "pld_mapping_verified": PLD_MAPPING_VERIFIED,
+}, open(RESULTS_DIR / "data_quality_gate.json", "w"), indent=2)""")
+
+# ============================================================
+# CELL 9 — Augmentation
+# ============================================================
+md("""---\n## Phase 2: Augmentation & Training""")
+
+code(r"""# ============================================================
+# CELL 9: Augmentation Pipelines
+# ============================================================
+try:
+    import albumentations as A
+    from albumentations.pytorch import ToTensorV2
+    HAS_ALB = True
+except ImportError:
+    HAS_ALB = False
+
+def get_transforms(img_size, is_train=True, strong=False):
+    norm = transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    if HAS_ALB:
+        if is_train:
+            tfs = [
+                A.RandomResizedCrop(img_size, img_size, scale=(0.5 if strong else 0.7, 1.0)),
+                A.HorizontalFlip(p=0.5), A.VerticalFlip(p=0.2),
+            ]
+            if strong:
+                tfs += [A.OneOf([A.RandomBrightnessContrast(0.3, 0.3, p=1),
+                                  A.HueSaturationValue(20, 30, 20, p=1)], p=0.8),
+                        A.OneOf([A.GaussianBlur(3, p=1), A.GaussNoise(10, 50, p=1)], p=0.3),
+                        A.Rotate(limit=15, p=0.5)]
+            else:
+                tfs += [A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=0.5), A.Rotate(limit=15, p=0.5)]
+            tfs += [A.Normalize(IMAGENET_MEAN, IMAGENET_STD), ToTensorV2()]
+            return A.Compose(tfs)
+        return A.Compose([A.Resize(int(img_size*1.14), int(img_size*1.14)),
+                          A.CenterCrop(img_size, img_size),
+                          A.Normalize(IMAGENET_MEAN, IMAGENET_STD), ToTensorV2()])
+    if is_train:
+        tfs = [transforms.RandomResizedCrop(img_size, scale=(0.5 if strong else 0.7, 1.0)),
+               transforms.RandomHorizontalFlip(), transforms.RandomVerticalFlip(p=0.2)]
+        if strong:
+            tfs += [transforms.RandAugment(num_ops=2, magnitude=9), transforms.RandomGrayscale(p=0.1)]
+        else:
+            tfs += [transforms.ColorJitter(0.2, 0.2, 0.2, 0.1), transforms.RandomRotation(15)]
+        tfs += [transforms.ToTensor(), norm]
+        return transforms.Compose(tfs)
+    return transforms.Compose([transforms.Resize(int(img_size*1.14)), transforms.CenterCrop(img_size),
+                               transforms.ToTensor(), norm])
+
+print("Augmentation ready.")""")
+
+# ============================================================
+# CELL 10 — Dataset & Model Factory
+# ============================================================
+code(r"""# ============================================================
+# CELL 10: Dataset & Model Factory
+# ============================================================
+class PotatoDataset(Dataset):
+    def __init__(self, paths, labels, transform=None):
+        self.paths, self.labels, self.transform = paths, labels, transform
+    def __len__(self): return len(self.paths)
+    def __getitem__(self, idx):
+        try:
+            img = Image.open(self.paths[idx]).convert("RGB")
+            if self.transform:
+                if HAS_ALB and not isinstance(self.transform, transforms.Compose):
+                    img = self.transform(image=np.array(img))["image"]
+                else:
+                    img = self.transform(img)
+            return img, self.labels[idx]
+        except Exception:
+            return self.__getitem__(random.randint(0, len(self)-1))
+
+def make_loaders(Xtr, ytr, Xva, yva, img_size, batch_size, strong=False):
+    tr = PotatoDataset(Xtr, ytr, get_transforms(img_size, True, strong))
+    va = PotatoDataset(Xva, yva, get_transforms(img_size, False))
+    nw = min(4, os.cpu_count() or 1)
+    kw = dict(num_workers=nw, pin_memory=torch.cuda.is_available())
+    return (DataLoader(tr, batch_size, shuffle=True, **kw),
+            DataLoader(va, batch_size*2, shuffle=False, **kw))
+
+def build_model(timm_name, num_classes=NUM_CLASSES, drop_path=0.0):
+    return timm.create_model(timm_name, pretrained=True, num_classes=num_classes,
+                             drop_path_rate=drop_path)
+
+def cpu_sd(sd): return {k: v.detach().cpu() for k, v in sd.items()}
+
+def save_ckpt(path, payload):
+    tmp = str(path) + ".tmp"; torch.save(payload, tmp); os.replace(tmp, path)
+
+print("Dataset & model factory ready.")""")
+
+# ============================================================
+# CELL 11 — Training Loop
+# ============================================================
+code(r"""# ============================================================
+# CELL 11: Training Loop
+# ============================================================
+def train_one_epoch(model, loader, crit, opt, scaler, mix_fn, device):
+    model.train(); tl, correct, total = 0.0, 0, 0
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)
+        yin = y
+        if mix_fn is not None: x, yin = mix_fn(x, y)
+        opt.zero_grad(set_to_none=True)
+        with torch.amp.autocast(device.type if device.type == "cuda" else "cpu"):
+            out = model(x); loss = crit(out, yin)
+        scaler.scale(loss).backward(); scaler.unscale_(opt)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        scaler.step(opt); scaler.update()
+        tl += loss.item()*x.size(0); correct += (out.argmax(1)==y).sum().item(); total += x.size(0)
+    return tl/total, correct/total
+
+@torch.no_grad()
+def evaluate(model, loader, device):
+    model.eval(); P, L, tl, tot = [], [], 0.0, 0
+    ce = nn.CrossEntropyLoss()
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)
+        o = model(x); tl += ce(o,y).item()*x.size(0); tot += x.size(0)
+        P.append(o.argmax(1).cpu().numpy()); L.append(y.cpu().numpy())
+    P, L = np.concatenate(P), np.concatenate(L)
+    return {"loss": tl/tot, "accuracy": float((P==L).mean()),
+            "macro_f1": float(f1_score(L, P, average="macro")),
+            "predictions": P, "labels": L}
+
+def train_model(name, timm_name, img_size, bs, Xtr, ytr, Xva, yva, device,
+                strong=True, label_smooth=0.1, wd=0.05, dp=0.1, patience=10):
+    ckpt_path = RESULTS_DIR / f"{name}_best.pth"
+    if ckpt_path.exists():
+        print(f"[SKIP] {name} checkpoint exists")
+        return torch.load(ckpt_path, map_location="cpu", weights_only=False)
+
+    set_seed(SEED)
+    tr_loader, va_loader = make_loaders(Xtr, ytr, Xva, yva, img_size, bs, strong)
+    model = build_model(timm_name, drop_path=dp).to(device)
+
+    cw = compute_class_weight("balanced", classes=np.arange(NUM_CLASSES), y=np.array(ytr))
+    cw = torch.FloatTensor(cw).to(device)
+    mix_fn = Mixup(mixup_alpha=0.2, cutmix_alpha=1.0, label_smoothing=label_smooth,
+                   num_classes=NUM_CLASSES, prob=1.0)
+    crit_train = SoftTargetCrossEntropy()
+    scaler = torch.amp.GradScaler("cuda" if device.type == "cuda" else "cpu")
+
+    best_f1, best_state, stage, epoch = -1.0, None, 1, 1
+    last_path = RESULTS_DIR / f"{name}_last.pth"
+    payload = None
+    if last_path.exists():
+        try:
+            payload = torch.load(last_path, map_location="cpu", weights_only=False)
+            model.load_state_dict(payload["model"])
+            best_f1 = payload["best_f1"]; best_state = payload["best_state"]
+            stage = payload["stage"]; epoch = payload["epoch"]+1
+            print(f"[RESUME] stage {stage} epoch {epoch}")
+        except: payload = None
+
+    while stage <= 2:
+        max_ep = 10 if stage == 1 else 50
+        use_mix = stage == 2
+        if stage == 1:
+            for p in model.parameters(): p.requires_grad = False
+            head = getattr(model, "head", None) or getattr(model, "classifier", None)
+            if head is None:
+                lins = [m for m in model.modules() if isinstance(m, nn.Linear)]; head = lins[-1]
+            for p in head.parameters(): p.requires_grad = True
+            opt = optim.AdamW(head.parameters(), lr=1e-3, weight_decay=wd)
+            crit = nn.CrossEntropyLoss(weight=cw, label_smoothing=label_smooth)
+            print(f"  Stage 1: head probe")
+        else:
+            for p in model.parameters(): p.requires_grad = True
+            hk = ("head","classifier","fc")
+            hp = [p for n,p in model.named_parameters() if any(k in n for k in hk)]
+            bp = [p for n,p in model.named_parameters() if not any(k in n for k in hk)]
+            opt = optim.AdamW([{"params":hp,"lr":1e-4},{"params":bp,"lr":1e-5}], weight_decay=wd)
+            crit = crit_train; print("  Stage 2: full fine-tune")
+
+        sch = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_ep)
+        pat = 0
+        while epoch <= max_ep:
+            t0 = time.time()
+            tl, ta = train_one_epoch(model, tr_loader, crit, opt, scaler,
+                                     mix_fn if use_mix else None, device)
+            v = evaluate(model, va_loader, device); sch.step()
+            imp = v["macro_f1"] > best_f1
+            if imp: best_f1 = float(v["macro_f1"]); best_state = cpu_sd(model.state_dict()); pat = 0
+            else: pat += 1
+            save_ckpt(last_path, {"stage":stage,"epoch":epoch,"model":cpu_sd(model.state_dict()),
+                                   "opt":opt.state_dict(),"sch":sch.state_dict(),"scaler":scaler.state_dict(),
+                                   "best_f1":best_f1,"best_state":best_state})
+            mark = " *" if imp else ""
+            print(f"    Ep {epoch:02d}/{max_ep} | TrL {tl:.4f} TrA {ta:.4f} | "
+                  f"VaL {v['loss']:.4f} VaA {v['accuracy']:.4f} F1 {v['macro_f1']:.4f}{mark} | {time.time()-t0:.0f}s", flush=True)
+            if pat >= patience: print(f"    Early stop stage {stage}"); break
+            epoch += 1
+        stage += 1; epoch = 1
+
+    if best_state: model.load_state_dict({k:v.to(device) for k,v in best_state.items()})
+    save_ckpt(ckpt_path, {"model":name,"timm_name":timm_name,"state_dict":cpu_sd(model.state_dict()),
+                           "img_size":img_size,"val_f1":best_f1})
+    if last_path.exists(): last_path.unlink()
+    print(f"  Saved: {ckpt_path} (val_f1={best_f1:.4f})")
+    del model; torch.cuda.empty_cache()
+    return torch.load(ckpt_path, map_location="cpu", weights_only=False)
+
+print("Training loop ready.")""")
+
+# ============================================================
+# CELL 12 — Train All
+# ============================================================
+md("""---\n## Phase 2b: Train All 4 Models""")
+
+code(r"""# ============================================================
+# CELL 12: Train/Load All 4 Models
+# ============================================================
+trained_models = {}
+for cfg in MODELS_CONFIG:
+    ckpt_path = RESULTS_DIR / f"{cfg['name']}_best.pth"
+    if ckpt_path.exists():
+        print(f"[SKIP] {cfg['name']}")
+        trained_models[cfg["name"]] = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    else:
+        extra = {"strong": True}
+        if cfg["name"] == "convnext_tiny_v2":
+            extra.update({"label_smooth": 0.1, "wd": 0.05, "dp": 0.1})
+        ckpt = train_model(cfg["name"], cfg["timm_name"], cfg["img_size"], cfg["batch_size"],
+                           X_train, y_train, X_val, y_val, device, **extra)
+        trained_models[cfg["name"]] = ckpt
+
+print(f"\nAll models ready: {list(trained_models.keys())}")""")
+
+# ============================================================
+# CELL 13 — Eval Helper
+# ============================================================
+code(r"""# ============================================================
+# CELL 13: Evaluation Helper
+# ============================================================
+def eval_on_dataset(model_name, ckpt, paths, labels, dataset_name):
+    model = build_model(ckpt["timm_name"])
+    model.load_state_dict(ckpt["state_dict"]); model.eval().to(device)
+    tf = get_transforms(ckpt["img_size"], False)
+    ds = PotatoDataset(paths, labels, tf)
+    loader = DataLoader(ds, batch_size=128, shuffle=False, num_workers=2, pin_memory=True)
+    r = evaluate(model, loader, device)
+    r["model_name"] = model_name; r["dataset"] = dataset_name
+    ba = balanced_accuracy_score(labels, r["predictions"])
+    print(f"\n--- {model_name} on {dataset_name} (n={len(labels)}) ---")
+    print(f"  Acc={r['accuracy']:.4f}  Macro-F1={r['macro_f1']:.4f}  Balanced-Acc={ba:.4f}")
+    print(classification_report(labels, r["predictions"], target_names=IPD_CLASS_NAMES, digits=4, zero_division=0))
+    del model; torch.cuda.empty_cache()
+    return r""")
+
+# ============================================================
+# CELL 14 — IPD Eval
+# ============================================================
+md("""---\n## Phase 3: Cross-Domain Evaluation""")
+
+code(r"""# ============================================================
+# CELL 14: IPD Test Evaluation
+# ============================================================
+print("=" * 60); print("IPD TEST SET"); print("=" * 60)
+ipd_results = {}
+for name in trained_models:
+    ipd_results[name] = eval_on_dataset(name, trained_models[name], X_test, y_test, "IPD Test")
+
+print("\n--- IPD TEST SUMMARY ---")
+print(f"{'Model':25s} {'Acc':>8s} {'F1':>8s}")
+for n, r in ipd_results.items():
+    print(f"{n:25s} {r['accuracy']:8.4f} {r['macro_f1']:8.4f}")""")
+
+# ============================================================
+# CELL 15 — PLD Eval
+# ============================================================
+code(r"""# ============================================================
+# CELL 15: PLD Cross-Dataset Evaluation
+# ============================================================
+pld_results = {}
+if len(pld_paths) > 0:
+    print("=" * 60); print("PLD CROSS-DATASET"); print("=" * 60)
+    for name in trained_models:
+        full = eval_on_dataset(name, trained_models[name], pld_paths, pld_labels.tolist(), "PLD Full")
+        clean_paths = [p for p, m in zip(pld_paths, clean_mask) if m]
+        clean_y = pld_labels[clean_mask].tolist()
+        clean = eval_on_dataset(name, trained_models[name], clean_paths, clean_y, "PLD Clean")
+        pld_results[name] = {"full": full, "clean": clean}
+
+    print("\n--- CROSS-DOMAIN COMPARISON ---")
+    print(f"{'Model':25s} {'IPD-F1':>8s} {'PLD-Full':>10s} {'PLD-Clean':>10s} {'Gap':>8s}")
+    for n in trained_models:
+        f1_ipd = ipd_results[n]["macro_f1"]
+        f1_full = pld_results[n]["full"]["macro_f1"]
+        f1_clean = pld_results[n]["clean"]["macro_f1"]
+        print(f"{n:25s} {f1_ipd:8.4f} {f1_full:10.4f} {f1_clean:10.4f} {f1_ipd-f1_full:8.4f}")
+else:
+    print("PLD not available. Skipping cross-domain evaluation.")
+
+json.dump({n: {"ipd_f1": ipd_results[n]["macro_f1"],
+               "pld_full_f1": pld_results.get(n, {}).get("full", {}).get("macro_f1"),
+               "pld_clean_f1": pld_results.get(n, {}).get("clean", {}).get("macro_f1")}
+           for n in trained_models}, open(RESULTS_DIR / "cross_domain.json", "w"), indent=2)""")
+
+# ============================================================
+# CELL 16 — Error Analysis
+# ============================================================
+md("""---\n## Phase 3b: Error Analysis""")
+
+code(r"""# ============================================================
+# CELL 16: PLD Error Analysis
+# ============================================================
+if len(pld_paths) > 0 and pld_results:
+    best_pld = max(pld_results.keys(), key=lambda n: pld_results[n]["full"]["macro_f1"])
+    print(f"Best PLD model: {best_pld}")
+
+    model = build_model(trained_models[best_pld]["timm_name"])
+    model.load_state_dict(trained_models[best_pld]["state_dict"]); model.eval().to(device)
+    tf = get_transforms(trained_models[best_pld]["img_size"], False)
+    ds = PotatoDataset(pld_paths, pld_labels.tolist(), tf)
+    loader = DataLoader(ds, batch_size=64, shuffle=False, num_workers=2)
+
+    all_probs = []
+    with torch.no_grad():
+        for x, _ in loader:
+            x = x.to(device)
+            with torch.amp.autocast(device.type if device.type == "cuda" else "cpu"):
+                out = model(x)
+            all_probs.append(torch.softmax(out.float(), dim=1).cpu().numpy())
+    probs = np.concatenate(all_probs); preds = probs.argmax(1); max_conf = probs.max(1)
+
+    records = []
+    for i in range(len(pld_paths)):
+        records.append({"path": pld_paths[i], "group": pld_groups[i],
+                         "true": IPD_CLASS_NAMES[pld_labels[i]], "pred": IPD_CLASS_NAMES[preds[i]],
+                         "correct": preds[i] == pld_labels[i], "confidence": float(max_conf[i])})
+    err_df = pd.DataFrame(records)
+
+    n_correct = err_df["correct"].sum(); n_total = len(err_df)
+    print(f"\nCorrect: {n_correct}/{n_total} ({n_correct/n_total*100:.1f}%)")
+    errors = err_df[~err_df["correct"]]
+    print(f"High-conf errors (>0.8): {(errors['confidence']>0.8).sum()}")
+    print(f"\nBy PLD group:")
+    for g in sorted(err_df["group"].unique()):
+        grp = err_df[err_df["group"]==g]; e = (~grp["correct"]).sum()
+        print(f"  {g:20s}: {e}/{len(grp)} ({e/len(grp)*100:.1f}%)")
+
+    err_df.to_csv(RESULTS_DIR / "pld_error_analysis.csv", index=False)
+    del model; torch.cuda.empty_cache()
+else:
+    print("Skipping PLD error analysis (no PLD data).")""")
+
+# ============================================================
+# CELL 17 — Error Grids
+# ============================================================
+code(r"""# ============================================================
+# CELL 17: Error Visualization Grids
+# ============================================================
+def show_grid(df, title, n=12):
+    subset = df.head(n)
+    if len(subset) == 0: print(f"No images: {title}"); return
+    cols = min(4, len(subset)); rows = (len(subset) + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(cols*4, rows*4))
+    axes = np.array(axes).flatten()
+    for i, (_, row) in enumerate(subset.iterrows()):
+        try:
+            img = Image.open(row["path"]).convert("RGB")
+            axes[i].imshow(img)
+            c = "green" if row["correct"] else "red"
+            axes[i].set_title(f"T:{row['true']} P:{row['pred']} C:{row['confidence']:.2f}", color=c, fontsize=9)
+        except: axes[i].text(0.5,0.5,"?", ha="center", va="center")
+        axes[i].axis("off")
+    for j in range(i+1, len(axes)): axes[j].axis("off")
+    plt.suptitle(title, fontsize=13, fontweight="bold"); plt.tight_layout()
+    plt.savefig(RESULTS_DIR / f"grid_{title.replace(' ','_').lower()}.png", dpi=120, bbox_inches="tight")
+    plt.show()
+
+if "err_df" in dir():
+    errors = err_df[~err_df["correct"]]
+    for cls in IPD_CLASS_NAMES:
+        show_grid(errors[errors["true"]==cls].sort_values("confidence", ascending=False), f"False {cls}")
+    show_grid(errors.sort_values("confidence", ascending=False), "High-Conf Mistakes")
+    show_grid(err_df[err_df["correct"]].sort_values("confidence"), "Low-Conf Correct")""")
+
+# ============================================================
+# CELL 18 — Grad-CAM
+# ============================================================
+md("""---\n## Phase 3c: Grad-CAM""")
+
+code(r"""# ============================================================
+# CELL 18: Grad-CAM
+# ============================================================
+try:
+    from pytorch_grad_crl import GradCAM
+    from pytorch_grad_crl.utils import show_cam_on_image
+    HAS_GC = True
+except ImportError:
+    try:
+        from grad_cam import GradCAM
+        from grad_cam.utils.image import show_cam_on_image
+        HAS_GC = True
+    except ImportError: HAS_GC = False
+
+if HAS_GC:
+    def get_target_layer(model, name):
+        if "convnext" in name: return model.features[-1]
+        if "efficientnet" in name: return model.features[-1]
+        if "swin" in name: return model.features[-1]
+        for m in reversed(list(model.modules())):
+            if isinstance(m, nn.Conv2d): return m
+        return None
+
+    def show_gradcam_image(model_name, ckpt, img_path, true_label=None):
+        model = build_model(ckpt["timm_name"]); model.load_state_dict(ckpt["state_dict"])
+        model.eval().to(device)
+        tl = get_target_layer(model, ckpt["timm_name"])
+        if tl is None: print("No target layer"); return
+        cam = GradCAM(model=model, target_layers=[tl], use_cuda=device.type=="cuda")
+        img = Image.open(img_path).convert("RGB")
+        tf = get_transforms(ckpt["img_size"], False)
+        x = tf(img).unsqueeze(0).to(device)
+        with torch.no_grad():
+            out = model(x); probs = torch.softmax(out, dim=1)
+            pred = out.argmax(1).item(); conf = probs[0, pred].item()
+        gcam = cam(input_tensor=x)[0]
+        vis = show_cam_on_image(np.array(img.resize((ckpt["img_size"], ckpt["img_size"])))/255.0, gcam, use_rgb=True)
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        axes[0].imshow(img); axes[0].set_title(f"Original True: {IPD_CLASS_NAMES[true_label] if true_label is not None else '?'}")
+        axes[1].imshow(gcam, cmap="jet"); axes[1].set_title("Grad-CAM")
+        axes[2].imshow(vis); axes[2].set_title(f"Overlay Pred: {IPD_CLASS_NAMES[pred]} ({conf:.2f})")
+        for a in axes: a.axis("off")
+        plt.suptitle(f"{model_name} - {Path(img_path).name}", fontweight="bold")
+        plt.tight_layout(); plt.savefig(RESULTS_DIR/f"gradcam_{Path(img_path).stem}.png", dpi=120); plt.show()
+        del model; torch.cuda.empty_cache()
+
+    if len(pld_paths) > 0:
+        best_m = max(pld_results.keys(), key=lambda n: pld_results[n]["full"]["macro_f1"])
+        for idx in np.random.choice(len(pld_paths), min(4, len(pld_paths)), replace=False):
+            show_gradcam_image(best_m, trained_models[best_m], pld_paths[idx], pld_labels[idx])
+else:
+    print("Grad-CAM not available. pip install grad-cam")""")
+
+# ============================================================
+# CELL 19 — Confusion Matrices
+# ============================================================
+code(r"""# ============================================================
+# CELL 19: Confusion Matrices
+# ============================================================
+best_n = max(ipd_results.keys(), key=lambda n: ipd_results[n]["macro_f1"])
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+cm1 = confusion_matrix(y_test, ipd_results[best_n]["predictions"])
+sns.heatmap(cm1, annot=True, fmt="d", cmap="Blues", ax=axes[0],
+            xticklabels=IPD_CLASS_NAMES, yticklabels=IPD_CLASS_NAMES)
+axes[0].set_title(f"IPD Test ({best_n})"); axes[0].set_ylabel("True"); axes[0].set_xlabel("Pred")
+
+if len(pld_paths) > 0:
+    cm2 = confusion_matrix(pld_labels, pld_results[best_n]["full"]["predictions"])
+    sns.heatmap(cm2, annot=True, fmt="d", cmap="Oranges", ax=axes[1],
+                xticklabels=IPD_CLASS_NAMES, yticklabels=IPD_CLASS_NAMES)
+    axes[1].set_title(f"PLD Full ({best_n})"); axes[1].set_ylabel("True"); axes[1].set_xlabel("Pred")
+    cm2n = cm2.astype(float)/cm2.sum(axis=1, keepdims=True)
+    sns.heatmap(cm2n, annot=True, fmt=".2f", cmap="Oranges", ax=axes[2],
+                xticklabels=IPD_CLASS_NAMES, yticklabels=IPD_CLASS_NAMES)
+    axes[2].set_title("PLD Normalized"); axes[2].set_ylabel("True"); axes[2].set_xlabel("Pred")
+else:
+    axes[1].text(0.5,0.5,"PLD not available", ha="center", va="center", transform=axes[1].transAxes)
+    axes[1].set_title("PLD Full"); axes[1].axis("off")
+    axes[2].text(0.5,0.5,"PLD not available", ha="center", va="center", transform=axes[2].transAxes)
+    axes[2].set_title("PLD Normalized"); axes[2].axis("off")
+
+plt.suptitle("Confusion Matrices", fontsize=14, fontweight="bold")
+plt.tight_layout(); plt.savefig(RESULTS_DIR/"confusion_matrices.png", dpi=150); plt.show()""")
+
+# ============================================================
+# CELL 20 — Robustness (FIXED: reloads checkpoint)
+# ============================================================
+md("---\n## Phase 4: Production Robustness")
+code(r"""# ============================================================
+# CELL 20: Robustness Benchmark (FIXED: reloads checkpoint explicitly)
+# ============================================================
+import cv2
+
+def corrupt(img_path, ctype, sev=1):
+    img = cv2.imread(str(img_path))
+    if img is None: return None
+    if ctype == "blur":
+        k = 3 + sev*2; return cv2.GaussianBlur(img, (k, k), 0)
+    if ctype == "noise":
+        n = np.random.default_rng(SEED + sev).normal(0, sev*10, img.shape).astype(np.float32)
+        return np.clip(img.astype(np.float32)+n, 0, 255).astype(np.uint8)
+    if ctype == "jpeg":
+        _, enc = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, max(10, 90-sev*15)])
+        return cv2.imdecode(enc, 1)
+    if ctype == "brightness":
+        return np.clip(img.astype(np.float32)*(1+(sev-2)*0.3), 0, 255).astype(np.uint8)
+    if ctype == "rotation":
+        h, w = img.shape[:2]; M = cv2.getRotationMatrix2D((w/2,h/2), sev*5, 1.0)
+        return cv2.warpAffine(img, M, (w,h), borderMode=cv2.BORDER_REFLECT)
+    return img
+
+def evaluate_paths_with_ckpt(ckpt, paths, labels):
+    # FIXED: Reloads checkpoint explicitly instead of relying on stale model in memory.
+    model = build_model(ckpt["timm_name"])
+    model.load_state_dict(ckpt["state_dict"])
+    model.eval().to(device)
+    tf = get_transforms(ckpt["img_size"], False)
+    ds = PotatoDataset(paths, labels, tf)
+    loader = DataLoader(ds, batch_size=128, shuffle=False, num_workers=2,
+                        pin_memory=torch.cuda.is_available())
+    r = evaluate(model, loader, device)
+    del model
+    if torch.cuda.is_available(): torch.cuda.empty_cache()
+    return r
+
+print("Robustness benchmark...")
+sample_idx = np.random.default_rng(SEED).choice(len(X_test), min(250, len(X_test)), replace=False)
+sp = [X_test[i] for i in sample_idx]; sl = [y_test[i] for i in sample_idx]
+
+robust_rows = []
+tmp_dir = RESULTS_DIR / "tmp_cr"; tmp_dir.mkdir(exist_ok=True)
+
+for ctype in ["blur", "noise", "jpeg", "brightness", "rotation"]:
+    for sev in [1, 2, 3]:
+        cpaths = []
+        for k, p in enumerate(sp):
+            img = corrupt(p, ctype, sev)
+            tp = tmp_dir / f"{k}_{ctype}_s{sev}.png"
+            if img is None: raise RuntimeError(f"Could not read {p}")
+            cv2.imwrite(str(tp), img); cpaths.append(str(tp))
+
+        r = evaluate_paths_with_ckpt(trained_models[best_n], cpaths, sl)
+        robust_rows.append({"model": best_n, "corruption": ctype, "severity": sev,
+                            "accuracy": r["accuracy"], "macro_f1": r["macro_f1"]})
+        print(f"  {ctype:12s} s={sev}: F1={r['macro_f1']:.4f}")
+        for cp in cpaths: Path(cp).unlink(missing_ok=True)
+
+robust_df = pd.DataFrame(robust_rows)
+robust_df.to_csv(RESULTS_DIR/"robustness.csv", index=False)
+
+plt.figure(figsize=(10,5))
+for c in robust_df["corruption"].unique():
+    d = robust_df[robust_df["corruption"]==c]
+    plt.plot(d["severity"], d["macro_f1"], marker="o", label=c)
+plt.xlabel("Severity"); plt.ylabel("Macro-F1")
+plt.title("Robustness Under Corruptions"); plt.legend(); plt.grid(True, alpha=0.3)
+plt.tight_layout(); plt.savefig(RESULTS_DIR/"robustness.png", dpi=150); plt.show()""")
+
+# ============================================================
+# CELL 21 — OOD (FIXED: genuine images only)
+# ============================================================
+code(r"""# ============================================================
+# CELL 21: Out-of-Distribution Detection (FIXED: genuine images only)
+# ============================================================
+def collect_ood_paths():
+    paths = []
+    for d in OOD_DIRS:
+        if d.exists():
+            paths.extend(str(p) for p in d.rglob("*") if p.suffix.lower() in OOD_EXTS)
+    return sorted(set(paths))
+
+ood_paths = collect_ood_paths()
+
+print("=== OOD EVALUATION ===")
+if not ood_paths:
+    print("NO GENUINE OOD DATA FOUND.")
+    print("Create an OOD folder with real non-potato images:")
+    print("  OOD/tomato/  OOD/other_plants/  OOD/soil/  OOD/objects/")
+    print("Synthetic random-noise images are intentionally NOT accepted.")
+    ood_acceptance_rate = np.nan
+    OOD_DATA_AVAILABLE = False
+else:
+    OOD_DATA_AVAILABLE = True
+    model = build_model(trained_models[best_n]["timm_name"])
+    model.load_state_dict(trained_models[best_n]["state_dict"])
+    model.eval().to(device)
+    tf = get_transforms(trained_models[best_n]["img_size"], False)
+
+    def get_probs(paths):
+        ds = PotatoDataset(paths, [0]*len(paths), tf)
+        loader = DataLoader(ds, batch_size=64, shuffle=False, num_workers=2)
+        all_p = []
+        with torch.no_grad():
+            for x, _ in loader:
+                x = x.to(device)
+                with torch.amp.autocast(device.type if device.type == "cuda" else "cpu"):
+                    out = model(x)
+                all_p.append(torch.softmax(out.float(), dim=1).cpu().numpy())
+        return np.concatenate(all_p)
+
+    # Threshold on VALIDATION data, not test
+    val_p = get_probs(X_val)
+    ood_p = get_probs(ood_paths)
+    val_max = val_p.max(axis=1)
+    threshold = float(np.percentile(val_max, 5))
+    ood_acceptance_rate = float((ood_p.max(axis=1) >= threshold).mean())
+
+    print(f"Known validation reject rate: {(val_max < threshold).mean()*100:.1f}%")
+    print(f"OOD false-accept rate: {ood_acceptance_rate*100:.1f}%")
+    print(f"Threshold: {threshold:.4f}")
+
+    pd.DataFrame({"path": ood_paths, "max_probability": ood_p.max(axis=1),
+                   "accepted": ood_p.max(axis=1) >= threshold}).to_csv(RESULTS_DIR/"ood_predictions.csv", index=False)
+
+    plt.figure(figsize=(8,4))
+    plt.hist(val_max, bins=20, alpha=0.7, label="Known validation", density=True)
+    plt.hist(ood_p.max(axis=1), bins=20, alpha=0.7, label="Genuine OOD", density=True)
+    plt.axvline(threshold, linestyle="--", label=f"T={threshold:.3f}")
+    plt.xlabel("Max class probability"); plt.title("OOD Detection"); plt.legend()
+    plt.tight_layout(); plt.savefig(RESULTS_DIR/"ood.png", dpi=150); plt.show()
+    del model; torch.cuda.empty_cache()
+
+if "OOD_DATA_AVAILABLE" not in dir():
+    OOD_DATA_AVAILABLE = False""")
+
+# ============================================================
+# CELL 22 — Calibration (FIXED: validation-only threshold)
+# ============================================================
+code(r"""# ============================================================
+# CELL 22: Confidence Calibration (FIXED: validation-only)
+# ============================================================
+from scipy.optimize import minimize_scalar
+from scipy.special import softmax
+
+def collect_logits(ckpt, paths, labels):
+    model = build_model(ckpt["timm_name"])
+    model.load_state_dict(ckpt["state_dict"]); model.eval().to(device)
+    tf = get_transforms(ckpt["img_size"], False)
+    ds = PotatoDataset(paths, labels, tf)
+    loader = DataLoader(ds, batch_size=128, shuffle=False, num_workers=2)
+    logits, labs = [], []
+    with torch.no_grad():
+        for x, y in loader:
+            x = x.to(device)
+            with torch.amp.autocast(device.type if device.type == "cuda" else "cpu"):
+                logits.append(model(x).float().cpu().numpy())
+            labs.append(y.numpy())
+    del model; torch.cuda.empty_cache()
+    return np.concatenate(logits), np.concatenate(labs)
+
+def ece(probs, labels, n_bins=15):
+    conf = probs.max(1); pred = probs.argmax(1); correct = (pred == labels).astype(float)
+    edges = np.linspace(0, 1, n_bins+1); total = 0.0
+    for i in range(n_bins):
+        mask = (conf > edges[i]) & (conf <= edges[i+1])
+        if mask.any():
+            total += mask.mean() * abs(correct[mask].mean() - conf[mask].mean())
+    return float(total)
+
+def brier_multiclass(probs, labels):
+    return float(np.mean(np.sum((probs - np.eye(NUM_CLASSES)[labels])**2, axis=1)))
+
+ckpt = trained_models[best_n]
+val_logits, val_y = collect_logits(ckpt, X_val, y_val)
+test_logits, test_y = collect_logits(ckpt, X_test, y_test)
+
+def nll(T):
+    p = softmax(val_logits / T, axis=1)
+    return -np.log(np.clip(p[np.arange(len(val_y)), val_y], 1e-12, 1)).mean()
+
+T = float(minimize_scalar(nll, bounds=(0.1, 10.0), method="bounded").x)
+p_test_raw = softmax(test_logits, axis=1)
+p_test_cal = softmax(test_logits / T, axis=1)
+
+# Threshold from VALIDATION data only
+candidate_thresholds = np.linspace(0.50, 0.99, 100)
+p_val_cal = softmax(val_logits / T, axis=1)
+threshold_rows = []
+for t in candidate_thresholds:
+    accepted = p_val_cal.max(1) >= t
+    coverage = accepted.mean()
+    if coverage < 0.80: continue
+    accepted_acc = (p_val_cal[accepted].argmax(1) == val_y[accepted]).mean() if accepted.any() else 0
+    threshold_rows.append((t, coverage, accepted_acc))
+
+eligible = [r for r in threshold_rows if r[1] >= 0.95]
+if eligible:
+    threshold, coverage, accepted_acc = max(eligible, key=lambda r: r[2])
+else:
+    threshold = float(np.percentile(p_val_cal.max(1), 5))
+    coverage = float((p_val_cal.max(1) >= threshold).mean())
+    accepted_acc = float((p_val_cal[p_val_cal.max(1)>=threshold].argmax(1) ==
+                          val_y[p_val_cal.max(1)>=threshold]).mean())
+
+print(f"Temperature: {T:.4f}")
+print(f"Validation-selected threshold: {threshold:.4f}")
+print(f"Validation coverage: {coverage:.4f}")
+print(f"Validation accepted accuracy: {accepted_acc:.4f}")
+
+print(f"\n{'Metric':15s} {'Raw':>10s} {'Calibrated':>12s}")
+print(f"{'Accuracy':15s} {(p_test_raw.argmax(1)==test_y).mean():10.4f} {(p_test_cal.argmax(1)==test_y).mean():12.4f}")
+print(f"{'ECE':15s} {ece(p_test_raw,test_y):10.4f} {ece(p_test_cal,test_y):12.4f}")
+print(f"{'Brier':15s} {brier_multiclass(p_test_raw,test_y):10.4f} {brier_multiclass(p_test_cal,test_y):12.4f}")
+
+plt.figure(figsize=(7,5))
+for p, label in [(p_test_raw, "Raw"), (p_test_cal, "Calibrated")]:
+    conf = p.max(1); pred = p.argmax(1); acc = (pred==test_y).astype(float)
+    edges = np.linspace(0,1,11); xs=[]; ys=[]
+    for i in range(10):
+        m=(conf>edges[i])&(conf<=edges[i+1])
+        if m.any(): xs.append(conf[m].mean()); ys.append(acc[m].mean())
+    plt.plot(xs, ys, "s-", label=label)
+plt.plot([0,1],[0,1],"--", label="Perfect")
+plt.xlabel("Confidence"); plt.ylabel("Accuracy")
+plt.title(f"Calibration: {best_n}"); plt.legend(); plt.grid(True, alpha=0.3)
+plt.tight_layout(); plt.savefig(RESULTS_DIR/"calibration.png", dpi=150); plt.show()
+
+CALIBRATION = {"temperature": T, "threshold": float(threshold),
+               "validation_coverage": float(coverage), "validation_accepted_accuracy": float(accepted_acc)}
+json.dump(CALIBRATION, open(RESULTS_DIR/"calibration.json","w"), indent=2)""")
+
+# ============================================================
+# CELL 23 — Bootstrap CI (FIXED: paired resampling)
+# ============================================================
+md("""---\n## Phase 4b: Statistical Validation""")
+
+code(r"""# ============================================================
+# CELL 23: Bootstrap 95% CI (FIXED: paired resampling)
+# ============================================================
+def bootstrap_ci(y_true, y_pred, metric_fn, n=2000, seed=SEED):
+    # Paired bootstrap: same indices used for both y_true and y_pred.
+    rng = np.random.default_rng(seed)
+    y_true = np.asarray(y_true); y_pred = np.asarray(y_pred)
+    scores = np.empty(n, dtype=float)
+    idx = np.arange(len(y_true))
+    for b in range(n):
+        sample = rng.choice(idx, size=len(idx), replace=True)
+        scores[b] = metric_fn(y_true[sample], y_pred[sample])
+    return float(np.mean(scores)), float(np.percentile(scores, 2.5)), float(np.percentile(scores, 97.5))
+
+print("Bootstrap 95% CI (paired resampling, 2000 reps)")
+rows = []
+eval_sets = [("IPD Test", np.array(y_test), ipd_results[best_n]["predictions"])]
+if len(pld_paths) > 0:
+    eval_sets.append(("PLD Full", np.array(pld_labels), pld_results[best_n]["full"]["predictions"]))
+
+for dname, yt, yp in eval_sets:
+    acc = bootstrap_ci(yt, yp, lambda a,b: (a==b).mean())
+    f1 = bootstrap_ci(yt, yp, lambda a,b: f1_score(a,b,average="macro",zero_division=0))
+    rows.extend([
+        {"dataset": dname, "metric": "Accuracy", "score": acc[0], "lower": acc[1], "upper": acc[2]},
+        {"dataset": dname, "metric": "Macro-F1", "score": f1[0], "lower": f1[1], "upper": f1[2]},
+    ])
+    print(f"{dname:15s} Accuracy {acc[0]:.4f} [{acc[1]:.4f}, {acc[2]:.4f}]")
+    print(f"{'':15s} Macro-F1 {f1[0]:.4f} [{f1[1]:.4f}, {f1[2]:.4f}]")
+
+pd.DataFrame(rows).to_csv(RESULTS_DIR/"bootstrap_ci.csv", index=False)""")
+
+# ============================================================
+# CELL 24 — v1 vs v2 (FIXED: external-generalization winner)
+# ============================================================
+md("""---\n## Phase 5: Final Decision""")
+
+code(r"""# ============================================================
+# CELL 24: ConvNeXt v1 vs v2 Comparison
+# ============================================================
+v1n, v2n = "convnext_tiny_v1", "convnext_tiny_v2"
+if v1n in trained_models and v2n in trained_models:
+    comparison = []
+    for mn, v1, v2 in [
+        ("IPD Accuracy", ipd_results[v1n]["accuracy"], ipd_results[v2n]["accuracy"]),
+        ("IPD Macro-F1", ipd_results[v1n]["macro_f1"], ipd_results[v2n]["macro_f1"]),
+        ("PLD Full Macro-F1",
+         pld_results.get(v1n,{}).get("full",{}).get("macro_f1",0),
+         pld_results.get(v2n,{}).get("full",{}).get("macro_f1",0)),
+    ]:
+        comparison.append({"metric": mn, "v1": v1, "v2": v2, "v2-v1": v2-v1})
+
+    comp_df = pd.DataFrame(comparison)
+    print(comp_df.to_string(index=False))
+    comp_df.to_csv(RESULTS_DIR/"convnext_v1_v2_comparison.csv", index=False)
+
+    # Selection prioritizes external generalization
+    v1_ext = pld_results.get(v1n, {}).get("full", {}).get("macro_f1", 0)
+    v2_ext = pld_results.get(v2n, {}).get("full", {}).get("macro_f1", 0)
+    selected = v1n if v1_ext >= v2_ext else v2n
+    print(f"\nExternal-generalization winner: {selected}")
+else:
+    print("Need both v1 and v2 for comparison.")""")
+
+# ============================================================
+# CELL 25 — TTA (RETAINED)
+# ============================================================
+code(r"""# ============================================================
+# CELL 25: Test-Time Augmentation (RETAINED)
+# ============================================================
+def tta_predict(model, paths, labels, img_size):
+    # Original + horizontal flip, average probabilities.
+    base_tf = get_transforms(img_size, False)
+    flip_tf = transforms.Compose([
+        transforms.Resize(int(img_size * 1.14)), transforms.CenterCrop(img_size),
+        transforms.RandomHorizontalFlip(p=1.0),
+        transforms.ToTensor(), transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
+
+    ds_orig = PotatoDataset(paths, labels, base_tf)
+    ds_flip = PotatoDataset(paths, labels, flip_tf)
+    loader_o = DataLoader(ds_orig, batch_size=64, shuffle=False, num_workers=2)
+    loader_f = DataLoader(ds_flip, batch_size=64, shuffle=False, num_workers=2)
+
+    model.eval()
+    probs_all = []
+    with torch.no_grad():
+        for (x1, _), (x2, _) in zip(loader_o, loader_f):
+            x1, x2 = x1.to(device), x2.to(device)
+            with torch.amp.autocast(device.type if device.type == "cuda" else "cpu"):
+                p1 = torch.softmax(model(x1).float(), dim=1)
+                p2 = torch.softmax(model(x2).float(), dim=1)
+            probs_all.append(((p1 + p2) / 2).cpu().numpy())
+    return np.concatenate(probs_all)
+
+if TTA_ENABLED:
+    print("TTA: comparing normal vs TTA on IPD test (sample)...")
+    sample_idx = np.random.default_rng(SEED).choice(len(X_test), min(300, len(X_test)), replace=False)
+    sp = [X_test[i] for i in sample_idx]; sl = [y_test[i] for i in sample_idx]
+
+    ckpt = trained_models[best_n]
+    model = build_model(ckpt["timm_name"]); model.load_state_dict(ckpt["state_dict"]); model.to(device)
+
+    tf = get_transforms(ckpt["img_size"], False)
+    ds = PotatoDataset(sp, sl, tf)
+    loader = DataLoader(ds, batch_size=64, shuffle=False, num_workers=2)
+    normal_probs = []
+    with torch.no_grad():
+        for x, _ in loader:
+            x = x.to(device)
+            with torch.amp.autocast(device.type if device.type == "cuda" else "cpu"):
+                out = model(x)
+            normal_probs.append(torch.softmax(out.float(), dim=1).cpu().numpy())
+    normal_probs = np.concatenate(normal_probs)
+    tta_probs = tta_predict(model, sp, sl, ckpt["img_size"])
+
+    y_s = np.array(sl)
+    n_acc = (normal_probs.argmax(1)==y_s).mean(); n_f1 = f1_score(y_s, normal_probs.argmax(1), average="macro")
+    t_acc = (tta_probs.argmax(1)==y_s).mean(); t_f1 = f1_score(y_s, tta_probs.argmax(1), average="macro")
+    print(f"{'Method':10s} {'Acc':>8s} {'F1':>8s}")
+    print(f"{'Normal':10s} {n_acc:8.4f} {n_f1:8.4f}")
+    print(f"{'TTA':10s} {t_acc:8.4f} {t_f1:8.4f}")
+    print(f"{'Delta':10s} {t_acc-n_acc:+8.4f} {t_f1-n_f1:+8.4f}")
+    del model; torch.cuda.empty_cache()
+else:
+    print("TTA disabled.")""")
+
+# ============================================================
+# CELL 26 — Production Inference (FIXED: CPU-safe, calibrated)
+# ============================================================
+code(r"""# ============================================================
+# CELL 26: Production Inference (FIXED: CPU-safe, calibrated)
+# ============================================================
+class PotatoClassifier:
+    def __init__(self, model_path, threshold=None, temperature=None):
+        ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
+        self.model = build_model(ckpt["timm_name"])
+        self.model.load_state_dict(ckpt["state_dict"]); self.model.eval()
+        self.img_size = ckpt["img_size"]
+        self.class_names = ckpt.get("class_names", IPD_CLASS_NAMES)
+        self.threshold = float(ckpt.get("threshold", threshold if threshold is not None else 0.5))
+        self.temperature = float(ckpt.get("temperature", temperature if temperature is not None else 1.0))
+        self.tf = transforms.Compose([
+            transforms.Resize(int(self.img_size*1.14)), transforms.CenterCrop(self.img_size),
+            transforms.ToTensor(), transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
+
+    @torch.no_grad()
+    def predict(self, img_input):
+        if isinstance(img_input, (str, Path)): img = Image.open(img_input).convert("RGB")
+        elif isinstance(img_input, bytes): img = Image.open(io.BytesIO(img_input)).convert("RGB")
+        elif isinstance(img_input, Image.Image): img = img_input.convert("RGB")
+        else: raise ValueError(f"Bad input: {type(img_input)}")
+        x = self.tf(img).unsqueeze(0).to(self.device)
+        logits = self.model(x).float() / self.temperature
+        probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+        pred = int(probs.argmax()); conf = float(probs[pred])
+        return {
+            "prediction": self.class_names[pred] if conf >= self.threshold else "Unknown",
+            "confidence": round(conf, 4),
+            "probabilities": {n: round(float(probs[i]), 4) for i, n in enumerate(self.class_names)},
+            "status": "accepted" if conf >= self.threshold else "rejected",
+        }
+
+best_path = RESULTS_DIR / f"{best_n}_best.pth"
+clf = PotatoClassifier(best_path, threshold=CALIBRATION["threshold"], temperature=CALIBRATION["temperature"])
+print(f"Classifier loaded: {best_n}")
+print(f"Temperature: {clf.temperature:.4f}  Threshold: {clf.threshold:.4f}")
+
+# FIXED: CPU-safe state_dict
+production_payload = {
+    "model_name": best_n,
+    "state_dict": cpu_sd(clf.model.state_dict()),
+    "timm_name": trained_models[best_n]["timm_name"],
+    "img_size": clf.img_size,
+    "class_names": clf.class_names,
+    "threshold": clf.threshold,
+    "temperature": clf.temperature,
+}
+torch.save(production_payload, RESULTS_DIR/"production_model.pth")
+print(f"Production artifact saved: {RESULTS_DIR/'production_model.pth'}")""")
+
+# ============================================================
+# CELL 27 — Ensemble (RETAINED, off by default)
+# ============================================================
+code(r"""# ============================================================
+# CELL 27: Ensemble (RETAINED, off by default)
+# ============================================================
+if ENSEMBLE_ENABLED and len(trained_models) >= 2:
+    print("Ensemble: probability averaging across all models...")
+    model_probs = {}
+    for name, ckpt in trained_models.items():
+        model = build_model(ckpt["timm_name"]); model.load_state_dict(ckpt["state_dict"])
+        model.eval().to(device); tf = get_transforms(ckpt["img_size"], False)
+        ds = PotatoDataset(X_val[:2000], y_val[:2000], tf)
+        loader = DataLoader(ds, batch_size=64, shuffle=False, num_workers=2)
+        probs_l = []
+        with torch.no_grad():
+            for x, _ in loader:
+                x = x.to(device)
+                with torch.amp.autocast(device.type if device.type == "cuda" else "cpu"):
+                    out = model(x)
+                probs_l.append(torch.softmax(out.float(), dim=1).cpu().numpy())
+        model_probs[name] = np.concatenate(probs_l)
+        del model; torch.cuda.empty_cache()
+
+    avg = np.mean(list(model_probs.values()), axis=0)
+    pred = avg.argmax(axis=1)
+    y_v = np.array(y_val[:2000])
+    print(f"Ensemble val F1: {f1_score(y_v, pred, average='macro'):.4f}")
+else:
+    print("Ensemble disabled.")""")
+
+# ============================================================
+# CELL 28 — Strict Production Gate (FIXED)
+# ============================================================
+md("""---\n## Strict Production Gate""")
+
+code(r"""# ============================================================
+# CELL 28: STRICT PRODUCTION GATE (FIXED: fails closed)
+# ============================================================
+ipd_f1 = float(ipd_results[best_n]["macro_f1"])
+pld_f1 = float(pld_results[best_n]["full"]["macro_f1"]) if len(pld_paths) > 0 else float("nan")
+pld_clean_f1 = float(pld_results[best_n]["clean"]["macro_f1"]) if len(pld_paths) > 0 else float("nan")
+domain_gap = ipd_f1 - pld_f1 if not np.isnan(pld_f1) else float("nan")
+
+REQUIREMENTS = {
+    "ipd_macro_f1": 0.95,
+    "pld_full_macro_f1": 0.80,
+    "pld_clean_macro_f1": 0.80,
+    "max_domain_gap": 0.15,
+    "max_ood_false_accept_rate": 0.05,
+    "max_ece": 0.05,
+    "min_calibration_coverage": 0.95,
+}
+
+calibrated_test_ece = float(ece(p_test_cal, test_y))
+ood_far = float(ood_acceptance_rate) if OOD_DATA_AVAILABLE else np.nan
+cal_coverage = float(CALIBRATION["validation_coverage"])
+
+checks = [
+    ("IPD Macro-F1", ipd_f1, f">= {REQUIREMENTS['ipd_macro_f1']}", ipd_f1 >= REQUIREMENTS["ipd_macro_f1"]),
+]
+if not np.isnan(pld_f1):
+    checks += [
+        ("PLD Full Macro-F1", pld_f1, f">= {REQUIREMENTS['pld_full_macro_f1']}", pld_f1 >= REQUIREMENTS["pld_full_macro_f1"]),
+        ("PLD Clean Macro-F1", pld_clean_f1, f">= {REQUIREMENTS['pld_clean_macro_f1']}", pld_clean_f1 >= REQUIREMENTS["pld_clean_macro_f1"]),
+        ("Domain Gap", domain_gap, f"<= {REQUIREMENTS['max_domain_gap']}", domain_gap <= REQUIREMENTS["max_domain_gap"]),
+    ]
+else:
+    checks.append(("PLD data", 0.0, "AVAILABLE", False))
+
+checks += [
+    ("Calibration ECE", calibrated_test_ece, f"<= {REQUIREMENTS['max_ece']}", calibrated_test_ece <= REQUIREMENTS["max_ece"]),
+    ("Calibration Coverage", cal_coverage, f">= {REQUIREMENTS['min_calibration_coverage']}", cal_coverage >= REQUIREMENTS["min_calibration_coverage"]),
+]
+
+if not PLD_MAPPING_VERIFIED:
+    checks.append(("PLD label mapping", 0.0, "VERIFIED", False))
+
+if not OOD_DATA_AVAILABLE:
+    checks.append(("Genuine OOD dataset", 0.0, "AVAILABLE", False))
+else:
+    checks.append(("OOD false-accept rate", ood_far, f"<= {REQUIREMENTS['max_ood_false_accept_rate']}", ood_far <= REQUIREMENTS["max_ood_false_accept_rate"]))
+
+overall = "GREEN" if all(ok for *_, ok in checks) else "RED"
+verdict = "PRODUCTION READY" if overall == "GREEN" else "NOT PRODUCTION READY"
+
+print("=" * 78)
+print("STRICT PRODUCTION READINESS REPORT")
+print("=" * 78)
+print(f"{'Check':28s} {'Value':>10s} {'Requirement':>18s} {'PASS':>8s}")
+print("-" * 78)
+for name, value, req, ok in checks:
+    value_s = "N/A" if isinstance(value, float) and np.isnan(value) else f"{value:.4f}"
+    print(f"{name:28s} {value_s:>10s} {req:>18s} {('YES' if ok else 'NO'):>8s}")
+print("-" * 78)
+print(f"OVERALL: {overall}")
+print(f"VERDICT: {verdict}")
+print("=" * 78)
+
+if overall == "RED":
+    print("\nBLOCKERS:")
+    for name, value, req, ok in checks:
+        if not ok:
+            print(f"  - {name}: value={value}, requirement={req}")
+
+report = {
+    "model": best_n, "ipd_macro_f1": ipd_f1,
+    "pld_full_macro_f1": None if np.isnan(pld_f1) else pld_f1,
+    "pld_clean_macro_f1": None if np.isnan(pld_clean_f1) else pld_clean_f1,
+    "domain_gap": None if np.isnan(domain_gap) else domain_gap,
+    "calibrated_test_ece": calibrated_test_ece,
+    "ood_available": OOD_DATA_AVAILABLE,
+    "ood_false_accept_rate": None if np.isnan(ood_far) else ood_far,
+    "pld_mapping_verified": PLD_MAPPING_VERIFIED,
+    "requirements": REQUIREMENTS,
+    "checks": [{"name": n, "value": None if (isinstance(v,float) and np.isnan(v)) else v,
+                 "requirement": r, "pass": bool(ok)} for n,v,r,ok in checks],
+    "overall": overall, "verdict": verdict,
+}
+json.dump(report, open(RESULTS_DIR/"production_gate.json","w"), indent=2)
+print("\nReport saved:", RESULTS_DIR/"production_gate.json")""")
+
+# ============================================================
+# CELL 29 — Final Interpretation
+# ============================================================
+md(r"""---
+
+## Final Interpretation
+
+Do not call a model production-ready from IPD accuracy alone. The strict gate requires:
+- External-domain performance (PLD)
+- Verified PLD label semantics
+- Genuine OOD data
+- Calibration (ECE, coverage)
+- Small domain gap
+
+If any mandatory evidence is absent, the notebook intentionally returns **RED - NOT PRODUCTION READY**.""")
+
+# ============================================================
+# Assemble
+# ============================================================
+notebook = {
+    "nbformat": 4,
+    "nbformat_minor": 0,
+    "metadata": {
+        "colab": {"provenance": [], "gpuType": "T4"},
+        "kernelspec": {"name": "python3", "display_name": "Python 3"},
+        "language_info": {"name": "python"},
+        "accelerator": "GPU"
+    },
+    "cells": cells
+}
+
+out_path = Path(r"C:\Users\shadb\Downloads\dataset\potato_doc_production_v2_fixed.ipynb")
+with open(out_path, "w") as f:
+    json.dump(notebook, f, indent=1)
+
+print(f"{'='*60}")
+print(f"NOTEBOOK COMPLETE: {out_path}")
+print(f"Total cells: {len(cells)}")
+print(f"{'='*60}")
