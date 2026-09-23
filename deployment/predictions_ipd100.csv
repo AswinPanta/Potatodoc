@@ -1,0 +1,101 @@
+image,true,pred_ensemble,efficientnet_b3_v1,convnext_tiny_v1,swin_tiny_v1,convnext_tiny_v2,conf_ensemble
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt10361.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9828
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt10951.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.98
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt11049.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9772
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt1133.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9845
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt11470.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9831
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt1173.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9842
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt11971.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.983
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt13174.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9788
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt13461.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9791
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt14785.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9844
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt15593.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9834
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt15603.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9824
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt17020.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9811
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt17109.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9811
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt17486.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9824
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt3057.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9832
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt3332.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9831
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt3371.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9832
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt4423.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9786
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt4479.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9817
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt474.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9824
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt6196.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9591
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt6225.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.983
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt6303.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9799
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt6555.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9837
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt7552.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9786
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt816.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9829
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt8752.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9833
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt8814.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9828
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\EarlyBlight\earlyblt8913.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.983
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy10273.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9837
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy10641.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9837
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy10897.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9822
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy11856.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9827
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy13483.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9846
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy13968.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy14708.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy15142.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy15578.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9833
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy16824.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9839
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy17205.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9838
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy18195.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9847
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy18335.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy18906.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy18998.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9842
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy19329.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.984
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy19528.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9845
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy19774.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9827
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy19959.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9845
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy2900.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9838
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy3268.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9832
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy3501.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9844
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy4074.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9848
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy4395.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9838
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy4859.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9826
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy5451.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy5486.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9845
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy6255.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9842
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy634.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9833
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy7476.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9838
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy868.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy8729.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9849
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy8781.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9843
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy8939.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.984
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\Healthy\healthy9797.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Healthy,0.9843
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt10145.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9824
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt12735.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.984
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt13101.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9836
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt13229.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8724
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt13874.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt14130.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9792
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt1424.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9778
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt14955.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.983
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt1663.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.972
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt16887.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9833
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt17614.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9814
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt18814.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9816
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt19130.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9806
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt19690.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9836
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt201.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9816
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt20133.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9805
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt3170.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9795
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt3359.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9835
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt3748.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9844
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt3761.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9832
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt4258.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9834
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt4506.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9841
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt4821.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9835
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt5573.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9818
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt5778.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9846
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt5973.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.97
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt6698.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.984
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt68.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9833
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt6853.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9844
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt7277.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9835
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt7549.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9822
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt8284.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9836
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt8309.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9837
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt8855.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9794
+C:\Users\shadb\Downloads\dataset\deployment\ipd_reference_100\LateBlight\lateblt9101.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9856

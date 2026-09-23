@@ -3,7 +3,28 @@ from pathlib import Path
 import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks
 
-BASE_DIR = Path(__file__).resolve().parent
+# ============================================================
+# File handling code: Read / create directory
+# (independent of platform, created ahead, where Python code is)
+# ============================================================
+BASE_DIR = Path(__file__).resolve().parent  # training/ (where this code is)
+PROJECT_ROOT = BASE_DIR.parent  # repo root (where the Python code lives)
+DATA_DIR = PROJECT_ROOT / "PlantVillage"
+SAVED_MODELS_DIR = PROJECT_ROOT / "saved_models"
+
+
+def ensure_dir(path: Path) -> Path:
+    """Generate directory independent of platform, created ahead."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# Create necessary directory ahead (before any core ML code runs)
+ensure_dir(SAVED_MODELS_DIR)
+
+# ============================================================
+# Your Core Machine learning Codes
+# ============================================================
 
 IMAGE_SIZE = 256
 BATCH_SIZE = 32
@@ -13,7 +34,7 @@ INPUT_SHAPE = (IMAGE_SIZE, IMAGE_SIZE, CHANNELS)
 N_CLASSES = 3
 
 dataset = tf.keras.preprocessing.image_dataset_from_directory(
-    str(BASE_DIR / "../PlantVillage"),
+    str(DATA_DIR),
     shuffle=True,
     seed=42,
     image_size=(IMAGE_SIZE, IMAGE_SIZE),
@@ -79,7 +100,7 @@ model.compile(
 cb = [
     callbacks.EarlyStopping(patience=10, restore_best_weights=True),
     callbacks.ModelCheckpoint(
-        filepath=str(BASE_DIR / "../saved_models/_cnn_best.weights.h5"),
+        filepath=str(SAVED_MODELS_DIR / "_cnn_best.weights.h5"),
         save_best_only=True, save_weights_only=True, monitor='val_accuracy'
     )
 ]
@@ -98,12 +119,14 @@ scores = model.evaluate(test_ds)
 print(f"\nTest loss: {scores[0]:.4f}")
 print(f"Test accuracy: {scores[1]:.4f}")
 
+# Result -> always export to file (trained model + metrics)
 # Save as version 1 (overwrite existing)
-model.save(str(BASE_DIR / "../saved_models/1"))
+ensure_dir(SAVED_MODELS_DIR / "1")
+model.save(str(SAVED_MODELS_DIR / "1"))
 print("CNN Baseline saved to saved_models/1")
 
 # Save training results
-with open(str(BASE_DIR / "../saved_models/_cnn_results.txt"), "w") as f:
+with open(str(SAVED_MODELS_DIR / "_cnn_results.txt"), "w") as f:
     f.write(f"Test loss: {scores[0]:.4f}\n")
     f.write(f"Test accuracy: {scores[1]:.4f}\n")
     best_val_acc = max(history.history['val_accuracy'])

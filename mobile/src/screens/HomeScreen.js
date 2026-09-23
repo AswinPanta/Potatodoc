@@ -17,14 +17,14 @@ import HistoryModal from "../components/HistoryModal";
 
 export default function HomeScreen() {
   const { awake, warming, loadingModels, statusText } = useWakeUp();
-  const { models, modelNames } = useModels();
+  const { models, modelNames, defaultModel } = useModels();
   const { data, setData, isLoading, sendFile } = usePrediction();
   const { history, saveToHistory } = useHistory();
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [imageUri, setImageUri] = useState(null);
   const [hasImage, setHasImage] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("ensemble");
+  const [selectedModel, setSelectedModel] = useState("convnext_plantvillage");
   const [historyVisible, setHistoryVisible] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [heatmaps, setHeatmaps] = useState(null);
@@ -36,6 +36,13 @@ export default function HomeScreen() {
   useEffect(() => {
     fileRef.current = selectedFile;
   }, [selectedFile]);
+
+  // Sync to server default when it arrives (e.g. after Irish model added)
+  useEffect(() => {
+    if (defaultModel && models.includes(defaultModel)) {
+      setSelectedModel(defaultModel);
+    }
+  }, [defaultModel]);
 
   useEffect(() => {
     (async () => {

@@ -7,11 +7,25 @@ import time
 import json
 
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
+DATA_DIR = PROJECT_ROOT / "PlantVillage"
+SAVED_MODELS_DIR = PROJECT_ROOT / "saved_models"
+
+
+def ensure_dir(path: Path) -> Path:
+    """Generate directory independent of platform, created ahead."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# Create necessary directory ahead (before any core ML code runs)
+ensure_dir(SAVED_MODELS_DIR)
+
 IMAGE_SIZE = 256
 BATCH_SIZE = 32
 
 dataset = tf.keras.preprocessing.image_dataset_from_directory(
-    str(BASE_DIR / "../PlantVillage"),
+    str(DATA_DIR),
     shuffle=True,
     seed=42,
     image_size=(IMAGE_SIZE, IMAGE_SIZE),
@@ -53,10 +67,10 @@ def load_mobilenetv2(path):
     return tf.keras.models.load_model(path)
 
 print("\n========== LOADING MODELS ==========")
-cnn_model = load_cnn_baseline(str(BASE_DIR / "../saved_models/1"))
+cnn_model = load_cnn_baseline(str(SAVED_MODELS_DIR / "1"))
 print(f"CNN Baseline loaded: {cnn_model.count_params()} params")
 
-mv2_model = load_mobilenetv2(str(BASE_DIR / "../saved_models/3"))
+mv2_model = load_mobilenetv2(str(SAVED_MODELS_DIR / "3"))
 print(f"MobileNetV2 loaded: {mv2_model.count_params()} params")
 
 results = {}
@@ -195,8 +209,9 @@ results["Ensemble (CNN+MV2)"] = {
     "note": "Averages CNN Baseline and MobileNetV2 confidences"
 }
 
-# Save results
-with open(str(BASE_DIR / "../saved_models/_evaluation_results.json"), "w") as f:
+# Result -> always export to file (evaluation metrics)
+ensure_dir(SAVED_MODELS_DIR)
+with open(str(SAVED_MODELS_DIR / "_evaluation_results.json"), "w") as f:
     json.dump(results, f, indent=2)
 
 print("\n\n========== SUMMARY ==========")

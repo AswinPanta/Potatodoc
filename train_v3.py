@@ -16,15 +16,31 @@ from timm.data import Mixup
 from timm.loss import SoftTargetCrossEntropy
 
 # ============================================================
-# IrishPotato37G trainer - balanced anti-overfit AND anti-underfit recipe
+# File handling code: Read / create directory
+# (independent of platform, created ahead, where Python code is)
 # ============================================================
 SEED = 42
-DATA_DIR = Path(r"C:\Users\shadb\Downloads\dataset")
+BASE_DIR = Path(__file__).resolve().parent  # where this Python code is
+DATA_DIR = BASE_DIR  # dataset lives where the code is (platform-independent)
 BIG = DATA_DIR / "IrishPotato37G"
 CLASSES = ["earlyblt", "healthy", "lateblt"]
 CLASS_NAMES = ["Early Blight", "Healthy", "Late Blight"]
 NUM_CLASSES = 3
 RESULTS = DATA_DIR / "results"
+
+
+def ensure_dir(path: Path) -> Path:
+    """Generate directory independent of platform, created ahead."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# Create necessary directory ahead (before any core ML code runs)
+ensure_dir(RESULTS)
+
+# ============================================================
+# Your Core Machine learning Codes
+# ============================================================
 MODEL_NAME = "convnext_tiny_v3"
 TIMM_NAME = "convnext_tiny.fb_in22k"
 IMG_SIZE = 224
@@ -61,6 +77,7 @@ class ImageDataset(Dataset):
 
 
 def prepare():
+    ensure_dir(RESULTS)  # create necessary directory ahead
     cache = RESULTS / "split_cache_v3.json"
     if cache.exists():
         d = json.load(open(cache))
@@ -101,7 +118,7 @@ def cpu_sd(sd):
 
 
 def save_last(p, payload):
-    t = str(p) + ".tmp"; torch.save(payload, t); os.replace(t, p)
+    ensure_dir(Path(p).parent); t = str(p) + ".tmp"; torch.save(payload, t); os.replace(t, p)
 
 
 def train_epoch(model, loader, crit, opt, scaler, mix, device):
@@ -234,6 +251,8 @@ def main():
 
     model.load_state_dict({k: v.to(device) for k, v in best_state.items()})
     ckpt = RESULTS / f"{MODEL_NAME}_best.pth"
+    ensure_dir(ckpt.parent)  # create necessary directory ahead
+    # Result -> always export to file (trained model)
     torch.save({"model": MODEL_NAME, "state_dict": cpu_sd(model.state_dict()),
                 "img_size": IMG_SIZE, "val_f1": best_f1, "timm_name": TIMM_NAME}, ckpt)
     if last_path.exists(): last_path.unlink()

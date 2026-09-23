@@ -14,15 +14,30 @@ from sklearn.metrics import classification_report, f1_score, confusion_matrix
 import timm
 
 # ============================================================
-# CONFIG
+# File handling code: Read / create directory
+# (independent of platform, created ahead, where Python code is)
 # ============================================================
 SEED = 42
-DATA_DIR = Path(r"C:\Users\shadb\Downloads\dataset")
+BASE_DIR = Path(__file__).resolve().parent  # where this Python code is
+DATA_DIR = BASE_DIR  # dataset lives where the code is (platform-independent)
 CLASSES = ["earlyblt", "healthy", "lateblt"]
 CLASS_NAMES = ["Early Blight", "Healthy", "Late Blight"]
 NUM_CLASSES = len(CLASSES)
 OUTPUT_DIR = DATA_DIR / "results"
-OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def ensure_dir(path: Path) -> Path:
+    """Generate directory independent of platform, created ahead."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# Create necessary directory ahead (before any core ML code runs)
+ensure_dir(OUTPUT_DIR)
+
+# ============================================================
+# Your Core Machine learning Codes
+# ============================================================
 
 MODELS_TO_TRAIN = [
     {"name": "efficientnetv2_b3", "timm_name": "tf_efficientnetv2_b3", "img_size": 300, "batch_size": 32},
@@ -72,6 +87,7 @@ class ImageDataset(Dataset):
 
 
 def prepare_dataset():
+    ensure_dir(OUTPUT_DIR)  # create necessary directory ahead
     cache = OUTPUT_DIR / "split_cache.json"
     if cache.exists():
         d = json.load(open(cache))
@@ -230,6 +246,7 @@ def evaluate(model, loader, device):
 
 
 def save_last(path, payload):
+    ensure_dir(Path(path).parent)  # create necessary directory ahead
     tmp = str(path) + ".tmp"
     torch.save(payload, tmp)
     os.replace(tmp, path)
@@ -344,6 +361,8 @@ def train_model(model_name, timm_name, img_size, batch_size,
     print(f"  Best val macro-F1: {best_f1:.4f}")
 
     ckpt_path = OUTPUT_DIR / f"{model_name}_best.pth"
+    ensure_dir(ckpt_path.parent)  # create necessary directory ahead
+    # Result -> always export to file (trained model)
     torch.save({"model": model_name, "state_dict": cpu_sd(model.state_dict()),
                 "img_size": img_size, "val_f1": best_f1, "timm_name": timm_name}, ckpt_path)
     if last_path.exists():

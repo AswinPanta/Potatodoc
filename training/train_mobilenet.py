@@ -5,7 +5,28 @@ from tensorflow.keras import layers, models, callbacks
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
-BASE_DIR = Path(__file__).resolve().parent
+# ============================================================
+# File handling code: Read / create directory
+# (independent of platform, created ahead, where Python code is)
+# ============================================================
+BASE_DIR = Path(__file__).resolve().parent  # training/ (where this code is)
+PROJECT_ROOT = BASE_DIR.parent  # repo root (where the Python code lives)
+DATA_DIR = PROJECT_ROOT / "PlantVillage"
+SAVED_MODELS_DIR = PROJECT_ROOT / "saved_models"
+
+
+def ensure_dir(path: Path) -> Path:
+    """Generate directory independent of platform, created ahead."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# Create necessary directory ahead (before any core ML code runs)
+ensure_dir(SAVED_MODELS_DIR)
+
+# ============================================================
+# Your Core Machine learning Codes
+# ============================================================
 
 # Constants
 IMAGE_SIZE = 256
@@ -19,7 +40,7 @@ N_CLASSES = 3
 # Load dataset (you need to have the PlantVillage potato dataset in a 'PlantVillage' directory)
 # Dataset structure: PlantVillage/Potato___Early_blight, PlantVillage/Potato___Late_blight, PlantVillage/Potato___healthy
 dataset = tf.keras.preprocessing.image_dataset_from_directory(
-    str(BASE_DIR / "../PlantVillage"),
+    str(DATA_DIR),
     shuffle=True,
     seed=42,
     image_size=(IMAGE_SIZE, IMAGE_SIZE),
@@ -97,7 +118,7 @@ model.compile(
 phase1_callbacks = [
     callbacks.EarlyStopping(patience=5, restore_best_weights=True),
     callbacks.ModelCheckpoint(
-        filepath=str(BASE_DIR / "../saved_models/_phase1_best.weights.h5"),
+        filepath=str(SAVED_MODELS_DIR / "_phase1_best.weights.h5"),
         save_best_only=True,
         save_weights_only=True,
         monitor='val_accuracy'
@@ -131,7 +152,7 @@ model.compile(
 phase2_callbacks = [
     callbacks.EarlyStopping(patience=4, restore_best_weights=True),
     callbacks.ModelCheckpoint(
-        filepath=str(BASE_DIR / "../saved_models/_phase2_best.weights.h5"),
+        filepath=str(SAVED_MODELS_DIR / "_phase2_best.weights.h5"),
         save_best_only=True,
         save_weights_only=True,
         monitor='val_accuracy'
@@ -154,5 +175,16 @@ scores = model.evaluate(test_ds)
 print(f"Test loss: {scores[0]:.4f}")
 print(f"Test accuracy: {scores[1]:.4f}")
 
-model.save(str(BASE_DIR / "../saved_models/3"))
+# Result -> always export to file (trained model + metrics)
+ensure_dir(SAVED_MODELS_DIR / "3")
+model.save(str(SAVED_MODELS_DIR / "3"))
 print("Model saved to saved_models/3")
+
+# Save training results (same as other trainers)
+with open(str(SAVED_MODELS_DIR / "_mobilenet_results.txt"), "w") as f:
+    f.write(f"Test loss: {scores[0]:.4f}\n")
+    f.write(f"Test accuracy: {scores[1]:.4f}\n")
+    best_val_acc = max(history2.history['val_accuracy'])
+    f.write(f"Best validation accuracy (phase 2): {best_val_acc:.4f}\n")
+    f.write(f"Phase 1 epochs: {len(history1.history['loss'])}\n")
+    f.write(f"Phase 2 epochs: {len(history2.history['loss'])}\n")

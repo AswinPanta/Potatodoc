@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { File, UploadType } from "expo-file-system";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.65:8000";
 
-export const MODEL_IDS = ["cnn-baseline", "transfer-learning", "mobilenetv2"];
+export const MODEL_IDS = ["convnext_plantvillage"];
 
 // ---- Helpers -----------------------------------------------------------
 
@@ -157,23 +157,22 @@ export function useWakeUp() {
 
 export function useModels() {
   const [models, setModels] = useState([
-    "cnn-baseline",
-    "transfer-learning",
-    "mobilenetv2",
-    "ensemble",
+    "convnext_plantvillage",
   ]);
   const [modelNames, setModelNames] = useState({
-    "cnn-baseline": "CNN Baseline",
-    "transfer-learning": "Transfer Learning",
-    "mobilenetv2": "MobileNetV2",
+    "convnext_plantvillage": "ConvNeXt-Tiny (PlantVillage)",
   });
+  const [defaultModel, setDefaultModel] = useState("convnext_plantvillage");
 
   useEffect(() => {
     const fetchModels = async () => {
       try {
         const res = await axios.get(`${API_BASE}/models`, { timeout: 10000 });
-        setModels([...res.data.models, "ensemble"]);
+        setModels(res.data.models);
         setModelNames(res.data.modelNames);
+        if (res.data.default) {
+          setDefaultModel(res.data.default);
+        }
       } catch (err) {
         console.error("[Models fetch]", err.message || err);
       }
@@ -181,7 +180,7 @@ export function useModels() {
     fetchModels();
   }, []);
 
-  return { models, modelNames };
+  return { models, modelNames, defaultModel };
 }
 
 export function usePrediction() {

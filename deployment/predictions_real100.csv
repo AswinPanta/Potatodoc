@@ -1,0 +1,101 @@
+image,true,pred_ensemble,efficientnet_b3_v1,convnext_tiny_v1,swin_tiny_v1,convnext_tiny_v2,conf_ensemble
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\1692334247300.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Healthy,Late Blight,0.6572
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\1692334247364.jpg,Early Blight,Early Blight,Healthy,Early Blight,Early Blight,Early Blight,0.6313
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\1692334247401.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8966
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\1692335403753.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8341
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\1692336758769.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9042
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230712_114543.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9785
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230712_122247.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8592
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230712_122911.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9808
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230712_123306.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8988
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230712_154301.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9795
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230712_155554.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9588
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_105706.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9799
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_105848.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.888
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_110505.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9816
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_110528056.jpg,Early Blight,Healthy,Healthy,Healthy,Late Blight,Late Blight,0.5139
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_111326036.jpg,Early Blight,Healthy,Healthy,Healthy,Healthy,Late Blight,0.7691
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_111913.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8236
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_112024.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9456
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_112343452.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.894
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_124140776.jpg,Early Blight,Healthy,Healthy,Healthy,Healthy,Healthy,0.9058
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230802_124804236.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.95
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230815_112230.jpg,Early Blight,Early Blight,Healthy,Early Blight,Late Blight,Early Blight,0.4997
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230816_122009.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Late Blight,Early Blight,0.7188
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230816_122443.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9676
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\20230816_122510.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9123
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0121.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9763
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0143.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Early Blight,Late Blight,0.7586
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0148.JPG,Early Blight,Late Blight,Late Blight,Early Blight,Late Blight,Late Blight,0.6941
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0150.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9839
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0253 (1).JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9287
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0262.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8982
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0264.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9446
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0289.JPG,Early Blight,Early Blight,Late Blight,Early Blight,Early Blight,Late Blight,0.4793
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0727.JPG,Early Blight,Late Blight,Late Blight,Early Blight,Early Blight,Late Blight,0.4889
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0815.JPG,Early Blight,Late Blight,Late Blight,Early Blight,Late Blight,Early Blight,0.6064
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0817.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9755
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_0873.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9802
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230815_112811~2.jpg,Early Blight,Healthy,Healthy,Healthy,Healthy,Early Blight,0.7496
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230815_112858~2.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Early Blight,0.8345
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230815_115653~2.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Healthy,Late Blight,0.7433
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230815_121024~2.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Healthy,Early Blight,0.5995
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230815_151853.jpg,Early Blight,Healthy,Healthy,Late Blight,Healthy,Early Blight,0.4373
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230815_153607.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9376
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230816_121453.jpg,Early Blight,Early Blight,Late Blight,Late Blight,Early Blight,Early Blight,0.6121
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230816_121536~2.jpg,Early Blight,Early Blight,Late Blight,Late Blight,Early Blight,Early Blight,0.5625
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230816_121600.jpg,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8525
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_20230816_121737.jpg,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,Early Blight,0.9607
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_4674.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9768
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_4725.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9698
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_8079.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8546
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_8220.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Healthy,Late Blight,0.7915
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_8245.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9611
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_9378.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Early Blight,0.6232
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_9384.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9673
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_9405.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9773
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_9406.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9768
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_9452.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9735
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\EarlyBlight\IMG_9468.JPG,Early Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8871
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230712_120140.jpg,Healthy,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9607
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230712_121759.jpg,Healthy,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9667
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230712_131224.jpg,Healthy,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9579
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230712_131450.jpg,Healthy,Late Blight,Late Blight,Late Blight,Healthy,Late Blight,0.7295
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230712_132255.jpg,Healthy,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.886
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230712_133011.jpg,Healthy,Late Blight,Late Blight,Late Blight,Healthy,Late Blight,0.6619
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230802_112947115.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Late Blight,0.8126
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230802_123822.jpg,Healthy,Late Blight,Healthy,Late Blight,Healthy,Late Blight,0.5434
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230815_120822.jpg,Healthy,Healthy,Healthy,Late Blight,Healthy,Late Blight,0.5667
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230815_152832.jpg,Healthy,Healthy,Healthy,Healthy,Healthy,Late Blight,0.5864
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230816_121140.jpg,Healthy,Healthy,Healthy,Late Blight,Healthy,Late Blight,0.5295
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230816_121556.jpg,Healthy,Late Blight,Late Blight,Late Blight,Healthy,Late Blight,0.6273
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230816_121606.jpg,Healthy,Healthy,Healthy,Late Blight,Healthy,Late Blight,0.4952
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\20230922_154136.jpg,Healthy,Late Blight,Late Blight,Late Blight,Healthy,Late Blight,0.7314
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\Healthy\IMG_8204.JPG,Healthy,Healthy,Healthy,Healthy,Healthy,Late Blight,0.655
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230712_154222.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9747
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230712_154940.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9734
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230802_123623700.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9826
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230802_124004.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9747
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230802_124453444.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.972
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230802_124647.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9644
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230802_124700039.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9659
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230802_124741.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9653
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230802_125709.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.8459
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230816_122432.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9831
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\20230816_122505.jpg,Late Blight,Late Blight,Late Blight,Late Blight,Early Blight,Late Blight,0.7273
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_0244 (1).JPG,Late Blight,Late Blight,Late Blight,Late Blight,Early Blight,Early Blight,0.5004
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_0289 - Copy.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9798
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_0312 - Copy.JPG,Late Blight,Late Blight,Healthy,Late Blight,Late Blight,Late Blight,0.7922
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_0330.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9722
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_0340.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9642
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_4763.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9827
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_4815.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Early Blight,Late Blight,0.7405
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_8105.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9557
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9367.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9807
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9506 (1).JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9753
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9514 (1).JPG,Late Blight,Late Blight,Late Blight,Late Blight,Early Blight,Early Blight,0.5406
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9525.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Early Blight,Late Blight,0.6907
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9526 (1).JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9591
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9526.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9591
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9538.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9832
+C:\Users\shadb\Downloads\dataset\deployment\test_images_100\LateBlight\IMG_9566.JPG,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,Late Blight,0.9516

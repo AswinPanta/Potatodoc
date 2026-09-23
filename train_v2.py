@@ -15,14 +15,30 @@ from timm.data import Mixup
 from timm.loss import SoftTargetCrossEntropy
 
 # ============================================================
-# CONFIG - regularized retrain of ConvNeXt-Tiny (v2)
+# File handling code: Read / create directory
+# (independent of platform, created ahead, where Python code is)
 # ============================================================
 SEED = 42
-DATA_DIR = Path(r"C:\Users\shadb\Downloads\dataset")
+BASE_DIR = Path(__file__).resolve().parent  # where this Python code is
+DATA_DIR = BASE_DIR  # dataset lives where the code is (platform-independent)
 CLASSES = ["earlyblt", "healthy", "lateblt"]
 CLASS_NAMES = ["Early Blight", "Healthy", "Late Blight"]
 NUM_CLASSES = 3
 OUTPUT_DIR = DATA_DIR / "results"
+
+
+def ensure_dir(path: Path) -> Path:
+    """Generate directory independent of platform, created ahead."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# Create necessary directory ahead (before any core ML code runs)
+ensure_dir(OUTPUT_DIR)
+
+# ============================================================
+# Your Core Machine learning Codes
+# ============================================================
 MODEL_NAME = "convnext_tiny_v2"
 TIMM_NAME = "convnext_tiny.fb_in22k"
 IMG_SIZE = 224
@@ -60,6 +76,7 @@ class ImageDataset(Dataset):
 
 
 def load_split():
+    ensure_dir(OUTPUT_DIR)  # create necessary directory ahead
     d = json.load(open(OUTPUT_DIR / "split_cache.json"))
     print(f"Split loaded: train {len(d['X_train'])} val {len(d['X_val'])} test {len(d['X_test'])}")
     return d
@@ -90,6 +107,7 @@ def cpu_sd(sd):
 
 
 def save_last(path, payload):
+    ensure_dir(Path(path).parent)  # create necessary directory ahead
     tmp = str(path) + ".tmp"
     torch.save(payload, tmp)
     os.replace(tmp, path)
@@ -251,6 +269,8 @@ def main():
 
     model.load_state_dict({k: v.to(device) for k, v in best_state.items()})
     ckpt_path = OUTPUT_DIR / f"{MODEL_NAME}_best.pth"
+    ensure_dir(ckpt_path.parent)  # create necessary directory ahead
+    # Result -> always export to file (trained model)
     torch.save({"model": MODEL_NAME, "state_dict": cpu_sd(model.state_dict()),
                 "img_size": IMG_SIZE, "val_f1": best_f1, "timm_name": TIMM_NAME}, ckpt_path)
     if last_path.exists():

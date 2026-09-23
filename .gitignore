@@ -48,3 +48,27 @@ saved_models/
 tf-lite-models/
 *.h5
 *.tflite
+
+# Large datasets (do not push to GitHub)
+PLD/
+IrishPotato37G/
+PlantVillage/
+earlyblt/
+lateblt/
+healthy/
+ipd37_zips/
+test_images_from_internet/
+deployment/test_images_100/
+deployment/ipd_reference_100/
+
+# Large archives & checkpoints (GitHub 100MB limit)
+*.zip
+*.pth
+results/
+tmp*/
+deployment/*.pth
+
+# Training/fetch logs & local test artifacts
+train_*.txt
+*_log.txt
+abc.jpg
