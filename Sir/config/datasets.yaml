@@ -1,0 +1,17 @@
+# Dataset registry — where raw data lives and how to split it.
+# Pipeline repo NEVER stores raw images; all paths point to dataset/ folder.
+
+plantvillage:
+  root: "../dataset/PlantVillage"
+  classes: ["Potato___Early_blight", "Potato___Late_blight", "Potato___healthy"]
+  class_names: ["Early Blight", "Late Blight", "Healthy"]
+  split: [0.8, 0.1, 0.1]
+  split_cache: "../dataset/results/split_cache_plantvillage.json"
+
+irish:
+  root: "../dataset/IrishPotato37G"
+  classes: ["earlyblt", "healthy", "lateblt"]
+  class_names: ["Early Blight", "Healthy", "Late Blight"]
+  split: [0.7, 0.15, 0.15]
+  split_cache: "../dataset/results/split_cache_irish.json"
+  quarantine_dir: "_quarantine"

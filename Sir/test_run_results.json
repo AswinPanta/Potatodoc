@@ -1,0 +1,59 @@
+{
+  "predict_tests": [
+    {
+      "true": "Early Blight",
+      "pred": "Early Blight",
+      "conf": 0.9228,
+      "ok": "OK"
+    },
+    {
+      "true": "Early Blight",
+      "pred": "Early Blight",
+      "conf": 0.8418,
+      "ok": "OK"
+    },
+    {
+      "true": "Early Blight",
+      "pred": "Early Blight",
+      "conf": 0.9473,
+      "ok": "OK"
+    },
+    {
+      "true": "Late Blight",
+      "pred": "Late Blight",
+      "conf": 0.9986,
+      "ok": "OK"
+    },
+    {
+      "true": "Late Blight",
+      "pred": "Late Blight",
+      "conf": 0.9605,
+      "ok": "OK"
+    },
+    {
+      "true": "Late Blight",
+      "pred": "Late Blight",
+      "conf": 0.9891,
+      "ok": "OK"
+    },
+    {
+      "true": "Healthy",
+      "pred": "Healthy",
+      "conf": 0.9534,
+      "ok": "OK"
+    },
+    {
+      "true": "Healthy",
+      "pred": "Healthy",
+      "conf": 0.9448,
+      "ok": "OK"
+    },
+    {
+      "true": "Healthy",
+      "pred": "Healthy",
+      "conf": 0.9586,
+      "ok": "OK"
+    }
+  ],
+  "accuracy": 1.0
+}

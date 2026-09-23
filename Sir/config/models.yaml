@@ -1,0 +1,20 @@
+# Model registry — maps model_id to checkpoint + preprocessing.
+# Server loads this at startup. Mobile app discovers via GET /models.
+
+convnext_plantvillage:
+  checkpoint: "checkpoints/plantvillage/convnext_tiny_fold0_best.pth"
+  timm_name: "convnext_tiny.fb_in22k"
+  img_size: 224
+  dataset: plantvillage
+  class_names: ["Early Blight", "Late Blight", "Healthy"]
+  display_name: "ConvNeXt-Tiny (PlantVillage)"
+
+# Irish main model — checkpoint path reserved, filled after training.
+convnext_irish:
+  checkpoint: "checkpoints/irish/convnext_tiny_v3_best.pth"
+  timm_name: "convnext_tiny.fb_in22k"
+  img_size: 224
+  dataset: irish
+  class_names: ["Early Blight", "Healthy", "Late Blight"]
+  display_name: "ConvNeXt-Tiny (Irish)"
+  enabled: false
